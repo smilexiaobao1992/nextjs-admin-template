@@ -1,191 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/index";
-import { apiKey } from "@/lib/db/schema";
-import { eq, and, gt } from "drizzle-orm";
-
-/**
- * 扩展的 NextRequest 类型，包含 API Key 信息
- */
-export interface ApiKeyRequest extends NextRequest {
-  apiKey: Awaited<ReturnType<typeof validateApiKey>>["data"];
-}
-
-/**
- * 从请求头中提取 API Key
- * 支持两种方式：
- * 1. Authorization: Bearer sk_xxxxx
- * 2. X-API-Key: sk_xxxxx
- */
-function extractApiKey(req: NextRequest): string | null {
-  const authHeader = req.headers.get("authorization");
-  const xApiKey = req.headers.get("x-api-key");
-
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.substring(7);
-  }
-
-  return xApiKey;
-}
-
-/**
- * 验证 API Key
- * 检查：
- * 1. API Key 是否存在
- * 2. 状态是否为 active
- * 3. 是否未过期
- * 4. IP 白名单（如果配置）
- */
-export async function validateApiKey(req: NextRequest) {
-  const key = extractApiKey(req);
-
-  if (!key) {
-    return {
-      valid: false,
-      error: "Missing API key. Please provide X-API-Key header or Authorization: Bearer <key>",
-    };
-  }
-
-  // 查询 API Key
-  const keyRecord = await db.query.apiKey.findFirst({
-    where: eq(apiKey.key, key),
-    with: {
-      user: {
-        columns: {
-          id: true,
-          email: true,
-          name: true,
-        },
-      },
-    },
-  });
-
-  if (!keyRecord) {
-    return { valid: false, error: "Invalid API key" };
-  }
-
-  // 检查状态
-  if (keyRecord.status !== "active") {
-    return { valid: false, error: `API key is ${keyRecord.status}` };
-  }
-
-  // 检查过期时间
-  if (keyRecord.expiresAt && keyRecord.expiresAt < new Date()) {
-    // 自动标记为过期
-    await db
-      .update(apiKey)
-      .set({ status: "expired", updatedAt: new Date() })
-      .where(eq(apiKey.id, keyRecord.id));
-    return { valid: false, error: "API key has expired" };
-  }
-
-  // 检查 IP 白名单
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] ||
-                   req.headers.get("x-real-ip") ||
-                   "unknown";
-
-  if (keyRecord.ipAddress) {
-    const allowedIps = JSON.parse(keyRecord.ipAddress);
-    if (!allowedIps.includes(clientIp) && !allowedIps.includes("*")) {
-      return { valid: false, error: "IP address not allowed" };
-    }
-  }
-
-  return {
-    valid: true,
-    data: {
-      id: keyRecord.id,
-      name: keyRecord.name,
-      userId: keyRecord.userId,
-      user: keyRecord.user,
-      scopes: keyRecord.scopes || [],
-      rateLimit: keyRecord.rateLimit || 1000,
-    },
-  };
-}
-
-/**
- * 生成随机 API Key
- * 格式: sk_<32位随机字符>
- */
-export function generateApiKey(): { key: string; prefix: string } {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const randomBytes = Buffer.from(array).toString("base64url");
-  const key = `sk_${randomBytes}`;
-  const prefix = `sk_${randomBytes.substring(0, 8)}`;
-  return { key, prefix };
-}
-
-/**
- * 生成 Webhook Secret
- * 格式: whsec_<32位随机字符>
- */
-export function generateWebhookSecret(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const randomBytes = Buffer.from(array).toString("base64url");
-  return `whsec_${randomBytes}`;
-}
-
-/**
- * API Key 认证中间件
- * 自动验证 API Key 并附加到 request
- */
-export function withApiKey<T extends NextRequest = NextRequest, C = any>(
-  handler: (req: T, context?: C) => Promise<NextResponse>,
-  options: {
-    /** 需要的权限范围，如 ["orders:read"] */
-    scopes?: string[];
-  } = {}
-): (req: T, context?: C) => Promise<NextResponse> {
-  return async (req: T, context?: C) => {
-    // 验证 API Key
-    const validation = await validateApiKey(req);
-
-    if (!validation.valid) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 401 }
-      );
-    }
-
-    // 检查权限范围
-    if (options.scopes && options.scopes.length > 0) {
-      const hasScope = options.scopes.some(scope =>
-        validation.data?.scopes.includes(scope) ||
-        validation.data?.scopes.includes("*") // 通配符权限
-      );
-
-      if (!hasScope) {
-        return NextResponse.json(
-          { message: "Insufficient permissions. Required scopes: " + options.scopes.join(", ") },
-          { status: 403 }
-        );
-      }
-    }
-
-    // 附加 API Key 信息到 request
-    (req as unknown as ApiKeyRequest).apiKey = validation.data;
-
-    // 更新最后使用时间（异步，不阻塞响应）
-    if (validation.data?.id) {
-      db.update(apiKey)
-        .set({ lastUsedAt: new Date() })
-        .where(eq(apiKey.id, validation.data.id))
-        .catch(console.error);
-    }
-
-    try {
-      return await handler(req, context);
-    } catch (error) {
-      console.error("API Error:", error);
-      return NextResponse.json(
-        { message: "Internal server error" },
-        { status: 500 }
-      );
-    }
-  };
-}
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 /**
  * CORS 中间件
@@ -211,7 +26,7 @@ export function withCors<T extends NextRequest = NextRequest>(
     const {
       allowedOrigins = ["*"],
       allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      allowedHeaders = ["Content-Type", "Authorization", "X-API-Key"],
+      allowedHeaders = ["Content-Type", "Authorization"],
       allowCredentials = false,
       maxAge = 86400, // 24小时
     } = options;
@@ -259,6 +74,39 @@ export function withCors<T extends NextRequest = NextRequest>(
 }
 
 /**
+ * Better Auth 认证中间件
+ * 验证用户是否已登录
+ */
+export function withAuth<T extends NextRequest = NextRequest>(
+  handler: (req: T, userId: string) => Promise<NextResponse>
+): (req: T) => Promise<NextResponse> {
+  return async (req: T) => {
+    try {
+      const session = await auth.api.getSession({
+        headers: await headers(),
+      });
+
+      if (!session?.user) {
+        return NextResponse.json(
+          { message: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      // 将 userId 传递给 handler
+      return await handler(req, session.user.id);
+    } catch (error) {
+      // 开发环境记录错误（生产环境应使用结构化日志）
+      console.error("Auth middleware error:", error);
+      return NextResponse.json(
+        { message: "Authentication failed" },
+        { status: 401 }
+      );
+    }
+  };
+}
+
+/**
  * 简单的内存速率限制器
  * 注意：生产环境应使用 Redis
  */
@@ -267,11 +115,19 @@ class RateLimiter {
 
   /**
    * 检查速率限制
-   * @param key - 限制键（通常是 API Key ID 或 IP）
+   * @param key - 限制键（通常是用户 ID 或 IP）
    * @param limit - 时间窗口内允许的请求数
    * @param windowMs - 时间窗口（毫秒），默认1小时
    */
-  check(key: string, limit: number, windowMs: number = 3600000): { allowed: boolean; remaining: number; resetAt: Date } {
+  check(
+    key: string,
+    limit: number,
+    windowMs: number = 3600000
+  ): {
+    allowed: boolean;
+    remaining: number;
+    resetAt: Date;
+  } {
     const now = Date.now();
     const windowStart = now - windowMs;
 
@@ -279,7 +135,7 @@ class RateLimiter {
     let timestamps = this.requests.get(key) || [];
 
     // 清理过期的记录
-    timestamps = timestamps.filter(ts => ts > windowStart);
+    timestamps = timestamps.filter((ts) => ts > windowStart);
 
     // 检查是否超过限制
     if (timestamps.length >= limit) {
@@ -319,14 +175,18 @@ export function withRateLimit<T extends NextRequest = NextRequest>(
     limit?: number;
     /** 时间窗口（毫秒） */
     windowMs?: number;
+    /** 自定义限制键（默认使用 IP） */
+    keyFn?: (req: T) => string;
   }
 ): (req: T) => Promise<NextResponse> {
   return async (req: T) => {
-    const apiKeyData = (req as unknown as ApiKeyRequest).apiKey;
-    const limit = options?.limit ?? apiKeyData?.rateLimit ?? 1000;
+    const limit = options?.limit ?? 1000;
 
-    // 使用 API Key ID 或 IP 作为限制键
-    const key = apiKeyData?.id || req.headers.get("x-forwarded-for")?.split(",")[0] || "anonymous";
+    // 使用自定义函数或 IP 作为限制键
+    const key = options?.keyFn?.(req) ||
+      req.headers.get("x-forwarded-for")?.split(",")[0] ||
+      req.headers.get("x-real-ip") ||
+      "anonymous";
 
     const result = globalRateLimiter.check(key, limit, options?.windowMs);
 
@@ -354,22 +214,72 @@ export function withRateLimit<T extends NextRequest = NextRequest>(
 }
 
 /**
+ * 错误处理中间件
+ * 捕获处理器中的错误并返回统一格式的响应
+ */
+export function withErrorHandler<T extends NextRequest = NextRequest>(
+  handler: (req: T, ...args: any[]) => Promise<NextResponse>
+): (req: T, ...args: any[]) => Promise<NextResponse> {
+  return async (req: T, ...args: any[]) => {
+    try {
+      return await handler(req, ...args);
+    } catch (error) {
+      // 开发环境记录错误（生产环境应使用结构化日志）
+      console.error("API Error:", error);
+
+      const message = error instanceof Error ? error.message : "Internal server error";
+
+      return NextResponse.json(
+        { message },
+        { status: 500 }
+      );
+    }
+  };
+}
+
+/**
  * 组合中间件
- * 一次性应用 CORS、API Key 认证、速率限制
+ * 一次性应用 CORS、认证、速率限制、错误处理
  */
 export function withApiMiddleware<T extends NextRequest = NextRequest>(
-  handler: (req: T) => Promise<NextResponse>,
+  handler: (req: T, userId: string) => Promise<NextResponse>,
   options: {
+    /** 是否需要认证 */
+    requireAuth?: boolean;
+    /** CORS 配置 */
     cors?: Parameters<typeof withCors>[1];
-    apiKeyScopes?: string[];
+    /** 速率限制配置 */
     rateLimit?: Parameters<typeof withRateLimit>[1];
   } = {}
 ): (req: T) => Promise<NextResponse> {
-  return withCors(
-    withApiKey(
-      withRateLimit(handler, options.rateLimit),
-      { scopes: options.apiKeyScopes }
-    ),
-    options.cors
-  );
+  const { requireAuth = true } = options;
+
+  // 组合中间件：CORS -> RateLimit -> Auth -> ErrorHandler
+  let pipeline = handler;
+
+  // 添加错误处理
+  pipeline = withErrorHandler(pipeline) as any;
+
+  // 添加认证
+  if (requireAuth) {
+    const originalHandler = pipeline;
+    pipeline = ((req: T) => (originalHandler as any)(req)) as any;
+    pipeline = withAuth(pipeline as any) as any;
+  }
+
+  // 添加速率限制
+  if (options.rateLimit) {
+    const originalHandler = pipeline;
+    pipeline = ((req: T) => (originalHandler as any)(req)) as any;
+    pipeline = withRateLimit(pipeline as any, options.rateLimit) as any;
+  }
+
+  // 添加 CORS
+  if (options.cors) {
+    const originalHandler = pipeline;
+    pipeline = ((req: T) => (originalHandler as any)(req)) as any;
+    pipeline = withCors(pipeline as any, options.cors) as any;
+  }
+
+  return pipeline;
 }

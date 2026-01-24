@@ -1,13 +1,27 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db/index";
 import { profile } from "@/lib/db/schema";
+import { validateSignUpInput } from "@/lib/utils/validation";
 
 // 注册时自动创建 profile
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { email, password, name } = body;
-
   try {
+    const body = await req.json();
+
+    // 验证输入
+    const validation = validateSignUpInput(body);
+    if (!validation.valid) {
+      return Response.json(
+        {
+          message: "Invalid input",
+          errors: validation.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { email, password, name } = validation.data!;
+
     // 先调用 better-auth 的注册
     const authRes = await auth.api.signUpEmail({
       body: { email, password, name },
