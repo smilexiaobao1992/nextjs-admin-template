@@ -56,7 +56,7 @@ export default function AppShell({
       </div>
 
       <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DialogContent className="left-0 top-0 h-dvh w-[min(20rem,88vw)] max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-y-0 border-l-0 p-0">
+        <DialogContent className="left-0 top-0 h-dvh w-[min(18rem,82vw)] max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 p-0">
           <DialogTitle className="sr-only">移动导航</DialogTitle>
           <DialogDescription className="sr-only">选择要打开的后台页面</DialogDescription>
           <AppSidebar items={menus} label="移动导航" onNavigate={() => setMobileOpen(false)} />
