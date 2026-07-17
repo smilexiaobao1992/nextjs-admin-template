@@ -6,10 +6,10 @@ import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: {
-    default: "Admin Template",
-    template: "%s | Admin Template",
+    default: "管理中心",
+    template: "%s | 管理中心",
   },
-  description: "基于 Next.js、Better Auth 与 Drizzle 的开源管理后台模板",
+  description: "统一管理账号、角色、权限和系统菜单。",
 };
 
 export default function RootLayout({

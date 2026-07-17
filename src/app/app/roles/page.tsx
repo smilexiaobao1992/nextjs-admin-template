@@ -36,24 +36,24 @@ export default async function RolesPage({
   const canManageSystemRoles = isSystemAdminRole(roleKey);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <p className="mb-2 text-sm font-medium text-primary">角色</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">角色</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">角色管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧选择角色，右侧按资源分配操作权限。系统管理员自动拥有所有权限。
+          为不同岗位设置菜单和操作权限。系统管理员始终拥有全部权限。
         </p>
       </div>
 
       {notice && rbacNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
           {rbacNoticeMessages[notice]}
         </p>
       ) : null}
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.10)] lg:sticky lg:top-24">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] lg:sticky lg:top-24">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">角色列表</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{roles.length} 个角色</p>
@@ -62,7 +62,7 @@ export default async function RolesPage({
               <GuardedDirectoryLink
                 href="/app/roles?mode=create#rbac-detail"
                 aria-label="新增角色"
-                className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary/70 text-secondary-foreground transition-[background-color,color,transform] hover:bg-primary hover:text-primary-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus aria-hidden="true" className="size-4" />
               </GuardedDirectoryLink>
@@ -71,16 +71,16 @@ export default async function RolesPage({
           {roles.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">还没有角色。</div>
           ) : (
-            <nav aria-label="角色列表" className="max-h-[60vh] space-y-1 overflow-y-auto p-3 lg:max-h-[calc(100vh-12rem)]">
+            <nav aria-label="角色列表" className="max-h-[60vh] space-y-1 overflow-y-auto p-2.5 lg:max-h-[calc(100vh-12rem)]">
               {roles.map((item) => (
                 <GuardedDirectoryLink
                   key={item.id}
                   href={`/app/roles?selected=${encodeURIComponent(item.id)}#rbac-detail`}
                   className={cn(
-                    "flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-3 py-2 transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-3 py-2 transition-[background-color,color,box-shadow,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     !createMode && selectedRole?.id === item.id
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground",
+                      ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(126,47,24,0.2)]"
+                      : "hover:bg-secondary/75 hover:text-secondary-foreground",
                   )}
                 >
                   {item.isSystem ? <ShieldCheck aria-hidden="true" className="size-4 shrink-0" /> : <Shield aria-hidden="true" className="size-4 shrink-0" />}
@@ -96,16 +96,16 @@ export default async function RolesPage({
           )}
         </aside>
 
-        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.10)] sm:p-6">
+        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6">
           {createMode ? (
             <>
               <div className="mb-6 flex items-center gap-3">
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
                   <Shield aria-hidden="true" className="size-4" />
                 </span>
                 <div>
                   <h2 className="font-semibold">新增角色</h2>
-                  <p className="text-sm text-muted-foreground">Key 创建后不可修改，用于用户和服务端授权。</p>
+                  <p className="text-sm text-muted-foreground">角色标识创建后不可修改，请使用简短、稳定的英文名称。</p>
                 </div>
               </div>
               <GuardedEditForm action={createRoleAction} className="space-y-6">
@@ -124,7 +124,7 @@ export default async function RolesPage({
                   </div>
                 </div>
                 <PermissionMatrix permissions={permissions} selectedIds={new Set()} />
-                <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
                   <label className="flex min-h-10 items-center gap-2 text-sm">
                     <input type="checkbox" name="isDefault" />
                     设为新用户默认角色
@@ -210,13 +210,13 @@ function RoleDetail({
             </div>
           </div>
           {isAdmin ? (
-            <div className="rounded-lg bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-              系统管理员不需要逐项勾选，新增权限也会自动生效。
+            <div className="rounded-lg bg-secondary/70 px-4 py-3 text-sm text-secondary-foreground">
+              系统管理员始终拥有全部权限，无需逐项配置。
             </div>
           ) : (
             <PermissionMatrix permissions={permissions} selectedIds={selectedIds} />
           )}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
             <label className="flex min-h-10 items-center gap-2 text-sm">
               <input type="checkbox" name="isDefault" defaultChecked={role.isDefault} disabled={role.isSystem} />
               设为新用户默认角色
@@ -231,7 +231,7 @@ function RoleDetail({
             <p className="mt-2 break-words text-sm text-muted-foreground">{role.description || "无说明"}</p>
           </div>
           {isAdmin ? (
-            <p className="rounded-lg bg-secondary px-4 py-3 text-sm text-secondary-foreground">系统管理员自动拥有全部权限。</p>
+            <p className="rounded-lg bg-secondary/70 px-4 py-3 text-sm text-secondary-foreground">系统管理员自动拥有全部权限。</p>
           ) : (
             <PermissionMatrix permissions={permissions} selectedIds={selectedIds} readOnly />
           )}
@@ -274,13 +274,13 @@ function PermissionMatrix({
     <fieldset>
       <legend className="mb-3 text-sm font-medium">权限范围</legend>
       {visibleGroups.length === 0 ? (
-        <p className="rounded-lg border px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-lg bg-secondary/45 px-4 py-6 text-center text-sm text-muted-foreground">
           未分配任何权限
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-lg bg-secondary/35">
           {visibleGroups.map(([resource, items], index) => (
-            <div key={resource} className={cn("grid gap-3 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center", index > 0 && "border-t")}>
+            <div key={resource} className={cn("grid gap-3 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center", index > 0 && "border-t border-border/70")}>
               <div className="min-w-0">
                 <p className="truncate font-mono text-sm font-medium">{resource}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{items[0]?.name.replace(/^(查看|管理|访问|创建|编辑|删除)/, "") || resource}</p>
@@ -291,13 +291,13 @@ function PermissionMatrix({
                   const checked = selectedIds.has(permission.id);
                   if (readOnly) {
                     return (
-                      <span key={permission.id} className="flex min-h-10 items-center rounded-lg bg-muted/60 px-3 text-sm">
+                      <span key={permission.id} className="flex min-h-10 items-center rounded-lg bg-card/80 px-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.05)]">
                         {actionLabels[action] ?? action}
                       </span>
                     );
                   }
                   return (
-                    <label key={permission.id} className="flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm hover:bg-accent">
+                    <label key={permission.id} className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-card/70 px-3 text-sm transition-colors hover:bg-accent">
                       <input type="checkbox" name="permissionIds" value={permission.id} defaultChecked={checked} />
                       <span>{actionLabels[action] ?? action}</span>
                     </label>

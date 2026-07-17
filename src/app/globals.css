@@ -4,25 +4,33 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  --color-background: oklch(0.975 0.004 250);
-  --color-foreground: oklch(0.205 0.012 250);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.205 0.012 250);
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.205 0.012 250);
-  --color-primary: oklch(0.48 0.12 252);
-  --color-primary-foreground: oklch(0.985 0.005 250);
-  --color-secondary: oklch(0.94 0.008 250);
-  --color-secondary-foreground: oklch(0.29 0.018 250);
-  --color-muted: oklch(0.94 0.008 250);
-  --color-muted-foreground: oklch(0.52 0.016 250);
-  --color-accent: oklch(0.925 0.012 250);
-  --color-accent-foreground: oklch(0.25 0.016 250);
+  --color-background: oklch(0.965 0.008 80);
+  --color-foreground: oklch(0.22 0.01 70);
+  --color-card: oklch(0.995 0.003 80);
+  --color-card-foreground: oklch(0.22 0.01 70);
+  --color-popover: oklch(0.995 0.003 80);
+  --color-popover-foreground: oklch(0.22 0.01 70);
+  --color-primary: oklch(0.56 0.18 36);
+  --color-primary-foreground: oklch(0.985 0.006 75);
+  --color-secondary: oklch(0.925 0.012 75);
+  --color-secondary-foreground: oklch(0.29 0.015 70);
+  --color-muted: oklch(0.93 0.01 75);
+  --color-muted-foreground: oklch(0.5 0.014 70);
+  --color-accent: oklch(0.91 0.024 50);
+  --color-accent-foreground: oklch(0.31 0.035 38);
   --color-destructive: oklch(0.56 0.19 27);
   --color-destructive-foreground: oklch(0.985 0.005 27);
-  --color-border: oklch(0.885 0.009 250);
-  --color-input: oklch(0.84 0.012 250);
-  --color-ring: oklch(0.56 0.12 252);
+  --color-border: oklch(0.865 0.012 75);
+  --color-input: oklch(0.81 0.014 75);
+  --color-ring: oklch(0.56 0.18 36);
+
+  --color-sidebar: oklch(0.22 0.008 70);
+  --color-sidebar-foreground: oklch(0.92 0.008 75);
+  --color-sidebar-muted: oklch(0.68 0.01 75);
+  --color-sidebar-accent: oklch(0.3 0.014 65);
+  --color-sidebar-accent-foreground: oklch(0.96 0.006 75);
+  --color-sidebar-border: oklch(0.32 0.01 70);
+  --color-sidebar-ring: oklch(0.72 0.14 38);
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
@@ -32,25 +40,33 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: oklch(0.16 0.008 250);
-    --color-foreground: oklch(0.93 0.006 250);
-    --color-card: oklch(0.195 0.009 250);
-    --color-card-foreground: oklch(0.93 0.006 250);
-    --color-popover: oklch(0.215 0.009 250);
-    --color-popover-foreground: oklch(0.93 0.006 250);
-    --color-primary: oklch(0.72 0.11 252);
-    --color-primary-foreground: oklch(0.17 0.015 252);
-    --color-secondary: oklch(0.245 0.011 250);
-    --color-secondary-foreground: oklch(0.9 0.006 250);
-    --color-muted: oklch(0.245 0.011 250);
-    --color-muted-foreground: oklch(0.69 0.012 250);
-    --color-accent: oklch(0.28 0.014 250);
-    --color-accent-foreground: oklch(0.93 0.006 250);
+    --color-background: oklch(0.145 0.008 70);
+    --color-foreground: oklch(0.92 0.008 75);
+    --color-card: oklch(0.19 0.009 70);
+    --color-card-foreground: oklch(0.92 0.008 75);
+    --color-popover: oklch(0.215 0.01 70);
+    --color-popover-foreground: oklch(0.92 0.008 75);
+    --color-primary: oklch(0.72 0.16 38);
+    --color-primary-foreground: oklch(0.18 0.018 38);
+    --color-secondary: oklch(0.245 0.012 70);
+    --color-secondary-foreground: oklch(0.9 0.008 75);
+    --color-muted: oklch(0.245 0.011 70);
+    --color-muted-foreground: oklch(0.69 0.012 75);
+    --color-accent: oklch(0.29 0.02 45);
+    --color-accent-foreground: oklch(0.94 0.008 70);
     --color-destructive: oklch(0.69 0.17 27);
     --color-destructive-foreground: oklch(0.16 0.008 27);
-    --color-border: oklch(0.31 0.011 250);
-    --color-input: oklch(0.36 0.012 250);
-    --color-ring: oklch(0.72 0.11 252);
+    --color-border: oklch(0.31 0.012 70);
+    --color-input: oklch(0.36 0.014 70);
+    --color-ring: oklch(0.72 0.16 38);
+
+    --color-sidebar: oklch(0.115 0.006 70);
+    --color-sidebar-foreground: oklch(0.91 0.008 75);
+    --color-sidebar-muted: oklch(0.66 0.01 75);
+    --color-sidebar-accent: oklch(0.22 0.012 65);
+    --color-sidebar-accent-foreground: oklch(0.95 0.006 75);
+    --color-sidebar-border: oklch(0.25 0.01 70);
+    --color-sidebar-ring: oklch(0.72 0.16 38);
   }
 }
 
@@ -73,6 +89,11 @@ body {
 button,
 a {
   touch-action: manipulation;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

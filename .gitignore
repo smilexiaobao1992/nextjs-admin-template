@@ -9,6 +9,8 @@
 # testing
 /coverage
 /.playwright-cli/
+/.superpowers/
+/.worktrees/
 
 # next.js
 /.next/

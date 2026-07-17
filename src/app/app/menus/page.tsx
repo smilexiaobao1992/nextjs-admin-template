@@ -45,11 +45,11 @@ export default async function MenusPage({
       key={item.id}
       href={`/app/menus?selected=${encodeURIComponent(item.id)}#rbac-detail`}
       className={cn(
-        "flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-[background-color,color,box-shadow,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         nested && "ml-5",
         !createMode && selected?.id === item.id
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+          ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(126,47,24,0.2)]"
+          : "text-muted-foreground hover:bg-secondary/75 hover:text-secondary-foreground",
       )}
     >
       {nested ? <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" /> : null}
@@ -59,24 +59,24 @@ export default async function MenusPage({
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <p className="mb-2 text-sm font-medium text-primary">菜单</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">菜单</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">菜单管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧维护导航树，右侧编辑选中菜单。只支持一级分组和二级菜单，菜单权限只控制可见性，页面仍需服务端鉴权。
+          维护后台导航的名称、层级、顺序和访问范围。一级菜单可作为分组，二级菜单用于打开具体页面。
         </p>
       </div>
 
       {notice && rbacNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
           {rbacNoticeMessages[notice]}
         </p>
       ) : null}
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.10)] lg:sticky lg:top-24">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] lg:sticky lg:top-24">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">菜单树</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{menus.length} 个菜单</p>
@@ -85,7 +85,7 @@ export default async function MenusPage({
               <GuardedDirectoryLink
                 href="/app/menus?mode=create#rbac-detail"
                 aria-label="新增菜单"
-                className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary/70 text-secondary-foreground transition-[background-color,color,transform] hover:bg-primary hover:text-primary-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus aria-hidden="true" className="size-4" />
               </GuardedDirectoryLink>
@@ -97,7 +97,7 @@ export default async function MenusPage({
               {canWrite ? "点击右上角添加第一个菜单。" : "请联系管理员配置菜单。"}
             </div>
           ) : (
-            <nav aria-label="菜单配置树" className="max-h-[60vh] space-y-1 overflow-y-auto p-3 lg:max-h-[calc(100vh-12rem)]">
+            <nav aria-label="菜单配置树" className="max-h-[60vh] space-y-1 overflow-y-auto p-2.5 lg:max-h-[calc(100vh-12rem)]">
               {roots.map((root) => (
                 <div key={root.id} className="space-y-1">
                   {menuLink(root)}
@@ -108,16 +108,16 @@ export default async function MenusPage({
           )}
         </aside>
 
-        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.10)] sm:p-6">
+        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6">
           {createMode ? (
             <>
               <div className="mb-6 flex items-center gap-3">
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
                   <PanelLeft aria-hidden="true" className="size-4" />
                 </span>
                 <div>
                   <h2 className="font-semibold">新增菜单</h2>
-                  <p className="text-sm text-muted-foreground">分组路径可留空，二级菜单选择一个一级菜单作为上级。</p>
+                  <p className="text-sm text-muted-foreground">分组菜单可以不填写路径，页面菜单需要选择上级菜单。</p>
                 </div>
               </div>
               <MenuForm
@@ -239,7 +239,7 @@ function MenuForm({
           <Input id={`${prefix}-sort`} name="sortOrder" type="number" defaultValue={menu?.sortOrder ?? 100} />
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
         <label className="flex min-h-10 items-center gap-2 text-sm">
           <input type="checkbox" name="isVisible" defaultChecked={menu?.isVisible ?? true} />
           在导航中显示

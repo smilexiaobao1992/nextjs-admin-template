@@ -34,24 +34,24 @@ export default async function PermissionsPage({
   }, {});
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <p className="mb-2 text-sm font-medium text-primary">权限</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">权限</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">权限管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧按资源维护权限目录，右侧查看或编辑具体权限点。业务代码使用同一 key 做服务端鉴权。
+          按资源维护系统权限，控制不同角色可访问的页面和操作。
         </p>
       </div>
 
       {notice && rbacNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
           {rbacNoticeMessages[notice]}
         </p>
       ) : null}
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.10)] lg:sticky lg:top-24">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] lg:sticky lg:top-24">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">权限目录</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{permissions.length} 个权限点</p>
@@ -60,7 +60,7 @@ export default async function PermissionsPage({
               <GuardedDirectoryLink
                 href="/app/permissions?mode=create#rbac-detail"
                 aria-label="新增权限"
-                className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary/70 text-secondary-foreground transition-[background-color,color,transform] hover:bg-primary hover:text-primary-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Plus aria-hidden="true" className="size-4" />
               </GuardedDirectoryLink>
@@ -72,7 +72,7 @@ export default async function PermissionsPage({
               {canWrite ? "点击右上角添加第一个权限点。" : "请联系管理员配置权限。"}
             </div>
           ) : (
-            <nav aria-label="权限目录" className="max-h-[60vh] space-y-4 overflow-y-auto p-3 lg:max-h-[calc(100vh-12rem)]">
+            <nav aria-label="权限目录" className="max-h-[60vh] space-y-4 overflow-y-auto p-2.5 lg:max-h-[calc(100vh-12rem)]">
               {Object.entries(groups).map(([resource, items]) => (
                 <section key={resource} aria-labelledby={`permission-group-${resource}`}>
                   <h3 id={`permission-group-${resource}`} className="px-2 pb-1 font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -84,10 +84,10 @@ export default async function PermissionsPage({
                         key={item.id}
                         href={`/app/permissions?selected=${encodeURIComponent(item.id)}#rbac-detail`}
                         className={cn(
-                          "block min-h-10 rounded-lg px-3 py-2 transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "block min-h-10 rounded-lg px-3 py-2 transition-[background-color,color,box-shadow,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           !createMode && selected?.id === item.id
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-accent hover:text-accent-foreground",
+                            ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(126,47,24,0.2)]"
+                            : "hover:bg-secondary/75 hover:text-secondary-foreground",
                         )}
                       >
                         <span className="block truncate text-sm font-medium">{item.name}</span>
@@ -103,11 +103,11 @@ export default async function PermissionsPage({
           )}
         </aside>
 
-        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.10)] sm:p-6">
+        <section id="rbac-detail" className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6">
           {createMode ? (
             <>
               <div className="mb-6 flex items-center gap-3">
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
                   <KeyRound aria-hidden="true" className="size-4" />
                 </span>
                 <div>
@@ -168,7 +168,7 @@ export default async function PermissionsPage({
                     <Label htmlFor={`permission-description-${selected.id}`}>说明</Label>
                     <Input id={`permission-description-${selected.id}`} name="description" defaultValue={selected.description ?? ""} maxLength={200} />
                   </div>
-                  <SubmitButton variant="outline" pendingLabel="保存中…">保存权限</SubmitButton>
+                  <SubmitButton pendingLabel="保存中…">保存权限</SubmitButton>
                 </GuardedEditForm>
               ) : (
                 <dl className="grid gap-4 text-sm sm:grid-cols-2">

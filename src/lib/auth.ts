@@ -15,7 +15,7 @@ function trustedOrigins(): string[] | undefined {
 }
 
 export const auth = betterAuth({
-  appName: "Next.js Admin Template",
+  appName: "管理中心",
   baseURL: validateBetterAuthUrl(process.env.BETTER_AUTH_URL),
   secret: validateBetterAuthSecret(process.env.BETTER_AUTH_SECRET),
   trustedOrigins: trustedOrigins(),

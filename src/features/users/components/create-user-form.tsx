@@ -12,15 +12,15 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
   return (
     <section
       aria-labelledby="create-user-title"
-      className="rounded-xl bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.10)] sm:p-6"
+      className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
     >
       <div className="mb-5 flex items-center gap-3">
-        <span className="inline-flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+        <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
           <UserPlus aria-hidden="true" className="size-4" />
         </span>
         <div>
           <h2 id="create-user-title" className="font-semibold">创建用户</h2>
-          <p className="text-sm text-muted-foreground">公开注册默认关闭，账号由管理员创建并分配角色。</p>
+          <p className="text-sm text-muted-foreground">填写用户信息并选择角色，创建后即可登录系统。</p>
         </div>
       </div>
 

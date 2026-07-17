@@ -38,15 +38,15 @@ export default async function UsersPage({
       );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <p className="mb-2 text-sm font-medium text-primary">用户</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">用户</p>
         <h1 className="text-3xl font-semibold tracking-[-0.022em]">用户管理</h1>
-        <p className="mt-2 text-sm text-muted-foreground">创建凭据账号，并分配动态角色。</p>
+        <p className="mt-2 text-sm text-muted-foreground">查看系统账号，创建用户并调整角色。</p>
       </div>
 
       {notice && userNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
           {userNoticeMessages[notice]}
         </p>
       ) : null}

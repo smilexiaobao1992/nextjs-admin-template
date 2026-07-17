@@ -32,9 +32,9 @@ export function UserList({
   return (
     <section
       aria-labelledby="user-list-title"
-      className="overflow-hidden rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.10)]"
+      className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]"
     >
-      <div className="border-b px-5 py-4">
+      <div className="border-b border-border/70 px-5 py-4">
         <h2 id="user-list-title" className="font-semibold">账号列表</h2>
         <p className="mt-1 text-sm text-muted-foreground">共 {users.length} 个账号</p>
       </div>
@@ -42,11 +42,7 @@ export function UserList({
       {users.length === 0 ? (
         <div className="px-5 py-12 text-center">
           <p className="font-medium">还没有账号</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            使用上方表单创建用户，或在终端运行{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run admin:create</code>{" "}
-            创建首位管理员。
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">点击上方“创建用户”添加账号。若没有操作权限，请联系系统管理员。</p>
         </div>
       ) : (
         <Table>

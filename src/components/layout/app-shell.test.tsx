@@ -55,12 +55,43 @@ describe("app shell", () => {
       </AppShell>,
     );
 
-    expect(screen.getByRole("button", { name: /系统设置/ })).toBeInTheDocument();
+    const settingsToggle = screen.getByRole("button", { name: "系统设置" });
+    expect(settingsToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("link", { name: "用户" })).toHaveAttribute("href", "/app/users");
     expect(screen.getByRole("link", { name: "角色" })).toHaveAttribute("href", "/app/roles");
 
-    fireEvent.click(screen.getByRole("button", { name: "收起系统设置" }));
-    expect(screen.getByRole("button", { name: "展开系统设置" })).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(settingsToggle);
+    expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: "用户" })).not.toBeInTheDocument();
+
+    fireEvent.click(settingsToggle);
+    expect(settingsToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "用户" })).toHaveAttribute("href", "/app/users");
+  });
+
+  it("keeps route-less groups navigable when the desktop rail is collapsed", () => {
+    render(
+      <AppShell
+        user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
+        menus={[
+          {
+            id: "settings",
+            title: "系统设置",
+            href: "",
+            icon: "Settings",
+            children: [
+              { id: "m2", title: "用户", href: "/app/users", icon: "Users" },
+              { id: "m3", title: "角色", href: "/app/roles", icon: "Shield" },
+            ],
+          },
+        ]}
+      >
+        <p>页面内容</p>
+      </AppShell>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
+
+    expect(screen.getByRole("link", { name: "系统设置" })).toHaveAttribute("href", "/app/users");
   });
 });
