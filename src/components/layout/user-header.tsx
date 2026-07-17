@@ -20,7 +20,7 @@ export default function UserHeader({
   const roleLabel = user.roleLabel || user.role;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-card/95 px-4 shadow-[0_1px_0_rgba(62,47,35,0.04),0_8px_24px_rgba(62,47,35,0.04)] sm:px-6">
       <Button
         type="button"
         variant="ghost"
@@ -39,7 +39,7 @@ export default function UserHeader({
         </div>
         <span
           aria-hidden="true"
-          className="inline-flex size-9 items-center justify-center rounded-lg bg-secondary text-xs font-semibold text-secondary-foreground"
+          className="inline-flex size-9 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary"
         >
           {initials}
         </span>

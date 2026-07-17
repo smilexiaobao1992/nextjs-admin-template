@@ -40,16 +40,16 @@ export default function AppShell({
         跳到主要内容
       </a>
 
-      <div className={cn("hidden border-r md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
+      <div className={cn("hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
         <AppSidebar items={menus} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
 
-      <div className={cn("min-h-screen", collapsed ? "md:pl-20" : "md:pl-64")}>
+      <div className={cn("min-h-screen bg-background", collapsed ? "md:pl-20" : "md:pl-64")}>
         <UserHeader user={user} onOpenNavigation={() => setMobileOpen(true)} />
         <main
           id="main-content"
           tabIndex={-1}
-          className="mx-auto w-full max-w-7xl px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-8"
+          className="mx-auto w-full max-w-7xl px-4 py-7 outline-none sm:px-6 sm:py-9 lg:px-8 lg:py-10"
         >
           {children}
         </main>
