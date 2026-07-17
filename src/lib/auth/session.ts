@@ -1,96 +1,51 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db/index";
-import { profile } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { getCache } from "@/lib/cache";
+import { buildLoginHref } from "./authorization";
+import { isSystemAdminRole, roleHasPermission } from "@/lib/rbac/permissions";
 
-// Session 数据接口
-interface SessionData {
-  user: any;
-  session: any;
+export async function getRequestPathname(): Promise<string> {
+  const headerStore = await headers();
+  return headerStore.get("x-pathname") ?? "/app";
 }
 
 export async function getSession() {
-  const cache = getCache();
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("better-auth.session_token")?.value;
-
-  if (!sessionToken) {
-    return null;
-  }
-
-  // 检查缓存
-  const cacheKey = `session:${sessionToken}`;
-  const cached = await cache.get<SessionData>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    // 使用 Better Auth 的 getSession，会自动利用 cookieCache
-    const session = await auth.api.getSession({
-      headers: new Headers({
-        cookie: `better-auth.session_token=${sessionToken}`,
-      }),
-    });
-
-    if (session) {
-      // 存入缓存
-      await cache.set(cacheKey, session);
-    }
-
-    return session;
-  } catch {
-    return null;
-  }
+  return auth.api.getSession({ headers: await headers() });
 }
 
-export async function getCurrentUser() {
+export async function requireSession() {
   const session = await getSession();
-  return session?.user || null;
+
+  if (!session) {
+    redirect(buildLoginHref(await getRequestPathname()));
+  }
+
+  return session;
 }
 
-export async function getCurrentUserRole() {
-  const cache = getCache();
-  const user = await getCurrentUser();
+/** @deprecated Prefer requirePermission for app authorization. Kept for admin-plugin style checks. */
+export async function requireAdminSession() {
+  const session = await requireSession();
 
-  if (!user) {
-    return null;
+  if (!isSystemAdminRole(session.user.role)) {
+    redirect("/app?notice=forbidden");
   }
 
-  // 检查角色缓存
-  const cacheKey = `role:${user.id}`;
-  const cached = await cache.get<string>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    const userProfile = await db
-      .select({ role: profile.role })
-      .from(profile)
-      .where(eq(profile.id, user.id))
-      .limit(1);
-
-    const role = userProfile[0]?.role || "user";
-
-    // 存入缓存
-    await cache.set(cacheKey, role);
-
-    return role;
-  } catch {
-    return "user";
-  }
+  return session;
 }
 
-// 登出时清除缓存
-export async function clearSessionCache(sessionToken?: string) {
-  const cache = getCache();
+export async function requirePermission(permissionKey: string) {
+  const session = await requireSession();
+  const roleKey = session.user.role ?? "";
 
-  if (sessionToken) {
-    await cache.delete(`session:${sessionToken}`);
-  } else {
-    await cache.clear();
+  if (isSystemAdminRole(roleKey)) {
+    return session;
   }
+
+  const allowed = await roleHasPermission(roleKey, permissionKey);
+  if (!allowed) {
+    redirect("/app?notice=forbidden");
+  }
+
+  return session;
 }

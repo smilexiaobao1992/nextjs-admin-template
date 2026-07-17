@@ -1,39 +1,52 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { db } from "@/lib/db/index";
+import { admin } from "better-auth/plugins";
+import { defaultAc } from "better-auth/plugins/admin/access";
+import type { AccessControl } from "better-auth/plugins/access";
+import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { adminRole, userRole } from "@/lib/auth/access";
+import { validateBetterAuthSecret, validateBetterAuthUrl } from "@/lib/auth/env";
+
+function trustedOrigins(): string[] | undefined {
+  const value = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
+  return value?.split(",").map((origin) => origin.trim()).filter(Boolean);
+}
 
 export const auth = betterAuth({
+  appName: "Next.js Admin Template",
+  baseURL: validateBetterAuthUrl(process.env.BETTER_AUTH_URL),
+  secret: validateBetterAuthSecret(process.env.BETTER_AUTH_SECRET),
+  trustedOrigins: trustedOrigins(),
   database: drizzleAdapter(db, {
     provider: "pg",
-    schema: {
-      user: schema.user,
-      session: schema.session,
-      account: schema.account,
-      // 不传递完整 schema，避免 Better Auth 序列化所有表
-    },
+    schema,
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    disableSignUp: true,
+    minPasswordLength: 12,
   },
   session: {
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+      enabled: false,
     },
   },
-  // 配置 Better Auth 不返回敏感字段
-  authRoutes: {
-    signIn: {
-      successResponse: {
-        // 只返回 user 信息，不返回 account（包含密码）
-        exclude: ["account"],
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+  },
+  plugins: [
+    admin({
+      ac: defaultAc as AccessControl,
+      roles: {
+        admin: adminRole,
+        user: userRole,
       },
-    },
-  },
-  plugins: [nextCookies()],
+    }),
+    nextCookies(),
+  ],
 });
 
-export type Session = typeof auth.$Infer.Session;
+export type AuthSession = typeof auth.$Infer.Session;

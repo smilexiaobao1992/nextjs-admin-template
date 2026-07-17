@@ -1,298 +1,163 @@
 # Next.js Admin Template
 
-基于 Next.js 16 + React 19 的现代化管理后台模板，开箱即用。
+一个可直接复制的开源管理后台基础模板，保留认证、权限、数据库迁移、响应式后台壳和工程质量门槛，不附带虚假的业务模块。
 
-## 特性
-
-- **最新技术栈**: Next.js 16 (App Router) + React 19 + TypeScript
-- **认证系统**: 集成 Better Auth，支持邮箱密码登录
-- **权限管理**: 基于 RBAC 的权限系统框架
-- **数据库**: Drizzle ORM + PostgreSQL (Supabase)
-- **UI 组件**: 基于 Radix UI 的无障碍组件库
-- **样式方案**: Tailwind CSS v4 + 深色模式支持
-- **类型安全**: 完整的 TypeScript 类型定义
+默认界面为**简体中文**（`lang="zh-CN"`）。需要多语言时，在业务层自行接入 i18n。
 
 ## 技术栈
 
-| 分类 | 技术 |
-|------|------|
-| 框架 | Next.js 16 (App Router) |
-| UI | React 19 + Radix UI + Tailwind CSS v4 |
-| 数据库 | PostgreSQL (Supabase) + Drizzle ORM |
-| 认证 | Better Auth |
-| 状态管理 | React Hooks |
-| 缓存 | 内存缓存 / Upstash Redis |
+- Next.js 16.2、React 19、TypeScript、Tailwind CSS 4
+- Better Auth 1.6，邮箱密码登录与 Admin 插件
+- Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
+- Vitest、Testing Library、ESLint、GitHub Actions
 
-## 快速开始
+## 已实现的安全边界
 
-### 1. 克隆项目
+- 公开注册默认关闭，只保留 Better Auth 官方 `/api/auth/[...all]` handler。
+- `/app` 在服务端校验会话；业务页与 Server Action 使用动态权限（`requirePermission`）。
+- 角色 / 权限 / 菜单可在后台管理；`admin` 为系统超管，`member` 为默认可配置角色。
+- 未登录访问受保护路径会跳到 `/login?next=…`，登录后回到安全的本地路径。
+- Better Auth Admin 插件只保留只读用户列表权限；写操作走带事务保护的 Server Action。
+- 会话 cookie cache 关闭，角色降权和会话撤销直接读取数据库状态。
+- 认证端点使用数据库限速，适用于 Vercel 多实例。
+- 创建账号统一要求至少 12 位密码，并同时包含字母和数字。
+- `BETTER_AUTH_SECRET` 至少 32 字节；数据库事务保证至少保留一个 `admin`。
+
+更多说明见 [SECURITY.md](SECURITY.md)。
+
+## 环境要求
+
+- Node.js 20.19 或更高版本，推荐 Node.js 22
+- npm 10
+- PostgreSQL 15 或更高版本，或 Supabase 项目
+
+## 本地启动
 
 ```bash
-git clone <your-repo-url>
+git clone git@github.com:smilexiaobao1992/nextjs-admin-template.git
 cd nextjs-admin-template
-```
-
-### 2. 安装依赖
-
-```bash
-npm install
-# 或
-pnpm install
-# 或
-yarn install
-```
-
-### 3. 配置环境变量
-
-复制 `.env.example` 为 `.env.local` 并填写配置：
-
-```bash
+npm ci
 cp .env.example .env.local
 ```
 
-必需配置：
-```env
-# Supabase 数据库
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_DATABASE_URL=postgresql://postgres:[password]@db.xxx.supabase.co:5432/postgres
+编辑 `.env.local`：
 
-# Better Auth
-BETTER_AUTH_SECRET=your_random_secret_key  # 使用 openssl rand -base64 32 生成
+```env
+DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
+DIRECT_DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
+BETTER_AUTH_SECRET=change-me
 BETTER_AUTH_URL=http://localhost:3000
 ```
 
-### 4. 初始化数据库
+先运行 `openssl rand -base64 32`，用输出替换 `change-me`；占位值会被启动校验明确拒绝。
+
+然后执行：
 
 ```bash
-# 推送数据库 schema
-npm run db:push
-
-# 或打开 Drizzle Studio 可视化编辑
-npm run db:studio
-```
-
-### 5. 启动开发服务器
-
-```bash
+npm run db:migrate
+npm run admin:create
 npm run dev
 ```
 
-访问 http://localhost:3000
+浏览器打开 [http://localhost:3000](http://localhost:3000)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。
 
-## 项目结构
+## Supabase 与 Vercel
 
-```
-nextjs-admin-template/
-├── src/
-│   ├── app/                      # Next.js App Router
-│   │   ├── api/                  # API 路由
-│   │   │   └── auth/             # 认证 API
-│   │   ├── app/                  # 受保护的应用页面
-│   │   ├── dashboard/            # Dashboard 页面
-│   │   ├── login/                # 登录页面
-│   │   ├── register/             # 注册页面
-│   │   ├── layout.tsx            # 根布局
-│   │   ├── page.tsx              # 首页
-│   │   └── globals.css           # 全局样式
-│   ├── components/               # React 组件
-│   │   ├── ui/                   # 通用 UI 组件
-│   │   ├── layout/               # 布局组件
-│   │   │   ├── app-sidebar.tsx   # 侧边栏导航
-│   │   │   └── user-header.tsx   # 用户头部
-│   │   └── auth/                 # 认证组件
-│   ├── lib/                      # 工具和配置
-│   │   ├── db/                   # 数据库相关
-│   │   │   ├── index.ts          # 数据库连接
-│   │   │   └── schema.ts         # 数据库表定义
-│   │   ├── auth.ts               # Better Auth 配置
-│   │   ├── permissions/          # 权限系统
-│   │   ├── cache/                # 缓存工具
-│   │   ├── api-middleware.ts     # API 中间件
-│   │   └── utils.ts              # 通用工具函数
-│   └── types/                    # TypeScript 类型定义
-├── public/                       # 静态资源
-├── package.json
-├── tsconfig.json
-├── next.config.ts
-├── postcss.config.mjs
-└── .env.example                  # 环境变量模板
+1. 在 Supabase 创建项目，用 owner 直连地址设置 `DIRECT_DATABASE_URL`，然后运行 `npm run db:migrate`。
+2. 在 Supabase SQL Editor 中创建运行时角色。先替换示例密码，再执行：
+
+```sql
+create role app_user login password 'REPLACE_WITH_A_RANDOM_PASSWORD';
+grant connect on database postgres to app_user;
+grant usage on schema public to app_user;
+grant select, insert, update, delete on all tables in schema public to app_user;
+grant usage, select on all sequences in schema public to app_user;
+alter default privileges for role postgres in schema public
+  grant select, insert, update, delete on tables to app_user;
+alter default privileges for role postgres in schema public
+  grant usage, select on sequences to app_user;
 ```
 
-## 常见任务
+3. Vercel 的 `DATABASE_URL` 使用这个角色对应的 Supavisor transaction pooler 地址，端口通常为 `6543`。从 Supabase 控制台复制完整连接串，避免遗漏项目 ref。
+4. `DIRECT_DATABASE_URL` 继续使用 owner 连接，只用于迁移，不放进客户端代码，也不用于应用查询。
+5. 在 Vercel 配置 `DATABASE_URL`、随机生成的 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`。正式环境的 `BETTER_AUTH_URL` 必须是实际 HTTPS 域名。
+6. 如果独立前端需要跨域调用认证，再添加逗号分隔的 `BETTER_AUTH_TRUSTED_ORIGINS`。
 
-### 添加新页面
-
-1. 在 `src/app/app/` 下创建新目录和页面文件：
-
-```typescript
-// src/app/app/users/page.tsx
-import AppSidebar from "@/components/layout/app-sidebar";
-import UserHeader from "@/components/layout/user-header";
-
-export default function UsersPage() {
-  return (
-    <>
-      <AppSidebar />
-      <UserHeader />
-      <main className="ml-56 mt-16 p-6">
-        <h1 className="text-2xl font-bold">用户管理</h1>
-        {/* 页面内容 */}
-      </main>
-    </>
-  );
-}
-```
-
-2. 在 `src/components/layout/app-sidebar.tsx` 中添加导航：
-
-```typescript
-const navItems: NavItem[] = [
-  // ... 现有菜单
-  {
-    name: "用户管理",
-    icon: Users,
-    children: [
-      { name: "用户列表", href: "/app/users", icon: Users },
-    ],
-  },
-];
-```
-
-### 添加新 API 路由
-
-在 `src/app/api/` 下创建 API 路由：
-
-```typescript
-// src/app/api/users/route.ts
-import { withAuth } from "@/lib/api-middleware";
-import { db } from "@/lib/db/index";
-import { user } from "@/lib/db/schema";
-
-export const GET = withAuth(async () => {
-  const users = await db.select().from(user);
-  return Response.json({ users });
-});
-```
-
-### 添加数据库表
-
-1. 在 `src/lib/db/schema.ts` 中定义表：
-
-```typescript
-export const post = pgTable("post", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  authorId: text("author_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export type Post = typeof post.$inferSelect;
-export type NewPost = typeof post.$inferInsert;
-```
-
-2. 推送到数据库：
-
-```bash
-npm run db:push
-```
-
-### 扩展权限系统
-
-1. 在 `src/lib/db/schema.ts` 中添加新权限：
-
-```typescript
-export const permissionEnum = pgEnum("permission", [
-  // 现有权限...
-  "post_view",      // 新增
-  "post_create",    // 新增
-  "post_update",    // 新增
-  "post_delete",    // 新增
-]);
-```
-
-2. 在 `src/lib/permissions/` 中添加权限检查逻辑。
-
-## 数据库 Schema
-
-模板包含以下核心表：
-
-### 认证系统 (Better Auth)
-- `user` - 用户表
-- `account` - 账户表（存储密码和 OAuth 信息）
-- `session` - 会话表
-- `profile` - 用户扩展信息表
-
-### 权限系统
-- `role_permission` - 角色权限关联表
-
-### 审计日志
-- `audit_log` - 操作日志表
-
-### 示例业务表
-- `content_item` - 内容管理示例表
+不要在生产部署启动阶段自动执行 `db:push`。生产 schema 变更应先生成迁移、审查 SQL，再运行 `db:migrate`。
 
 ## 常用命令
 
+| 命令 | 用途 |
+| --- | --- |
+| `npm run dev` | 启动开发服务器 |
+| `npm run check` | lint、类型检查和测试 |
+| `npm run build` | 生产构建 |
+| `npm run db:generate` | 根据 schema 生成迁移 |
+| `npm run db:migrate` | 执行已提交迁移 |
+| `npm run db:verify` | 验证种子数据和关键数据库约束 |
+| `npm run db:studio` | 打开 Drizzle Studio |
+| `npm run admin:create` | 交互式创建管理员 |
+
+## 路由
+
+| 路由 | 权限 |
+| --- | --- |
+| `/login` | 公开（已登录会跳转到安全的 `next` 或 `/app`） |
+| `/app` | 已登录用户（菜单按角色权限过滤） |
+| `/app/users` | `users:read` / 写操作用 `users:write` |
+| `/app/roles` | `roles:read` / `roles:write` |
+| `/app/permissions` | `permissions:read` / `permissions:write` |
+| `/app/menus` | `menus:read` / `menus:write` |
+| `/api/auth/[...all]` | Better Auth handler |
+
+## 目录结构与业务扩展
+
+模板约定：**路由薄、feature 厚、ui 纯、auth/db 全局共享**。
+
+```text
+src/
+  app/                         # Next.js 路由与页面组装（尽量薄）
+    login/
+    app/                       # 受保护壳下的页面
+      page.tsx
+      users/page.tsx           # 组装 features/users，不写业务细节
+    api/auth/[...all]/
+  features/                    # 业务域（复制后主要加这里）
+    users/
+    rbac/                      # 角色 / 权限 / 菜单 Server Actions
+  components/
+    ui/
+    layout/                    # AppShell 接收服务端过滤后的 menus
+  lib/
+    auth/                      # 会话、requirePermission
+    rbac/                      # 权限解析、校验、CRUD
+    db/                        # schema 含 role / permission / menu
+    utils.ts
+  proxy.ts                     # 仅转发 pathname（Next.js 16 Proxy）
+```
+
+扩展建议：
+
+1. **新业务权限**：在「权限管理」新增 `orders:read` 等 key；在「角色管理」勾选；在页面/Action 调用 `requirePermission("orders:read")`。
+2. **新业务页**：`src/features/<domain>/` + `src/app/app/<route>/page.tsx`；在「菜单管理」加侧栏入口并绑定权限。
+3. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
+4. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查是安全层。
+5. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
+
+## 质量门槛
+
+GitHub Actions 使用 Node.js 22 与 PostgreSQL 17，依次执行：
+
 ```bash
-# 开发
-npm run dev
-
-# 构建
+npm ci
+npm run db:migrate
+npm run db:verify
+npm run check
 npm run build
-
-# 启动生产服务器
-npm run start
-
-# 数据库操作
-npm run db:generate   # 生成迁移文件
-npm run db:push       # 推送 schema 到数据库
-npm run db:studio     # 打开 Drizzle Studio
-
-# 代码检查
-npm run lint
 ```
 
-## 部署
+本地推荐同样跑 `npm run check` 与 `npm run build`。
 
-### Vercel
+## 许可证
 
-1. 将代码推送到 GitHub
-2. 在 Vercel 中导入项目
-3. 配置环境变量
-4. 部署
-
-### 其他平台
-
-确保平台支持 Node.js 18+ 和 PostgreSQL 数据库。
-
-## 自定义
-
-### 修改主题颜色
-
-编辑 `src/app/globals.css` 中的 CSS 变量：
-
-```css
-:root {
-  --primary: 214 95% 54%;  /* 主色调 */
-  /* ... 其他颜色变量 */
-}
-```
-
-### 移除不需要的功能
-
-- 移除示例业务表：删除 `src/lib/db/schema.ts` 中的 `contentItem` 表
-- 移除权限系统：删除 `src/lib/permissions/` 目录和相关代码
-- 移除审计日志：删除 `auditLog` 表和相关逻辑
-
-## License
-
-MIT
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+[MIT](LICENSE)

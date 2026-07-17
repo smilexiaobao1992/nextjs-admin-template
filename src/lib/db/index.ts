@@ -2,19 +2,24 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-const connectionString = process.env.SUPABASE_DATABASE_URL!;
+function requireDatabaseUrl(): string {
+  const value = process.env.DATABASE_URL;
 
-// 配置连接池以适配 Supabase pooler
-const client = postgres(connectionString, {
-  max: 20, // 增加最大连接数
-  idle_timeout: 20, // 空闲连接超时（秒）
-  connect_timeout: 10, // 连接超时（秒）
-  // Supabase pooler 模式需要禁用 prepared statements
+  if (!value) {
+    throw new Error("DATABASE_URL is required. Copy .env.example to .env.local and configure PostgreSQL.");
+  }
+
+  return value;
+}
+
+export const dbClient = postgres(requireDatabaseUrl(), {
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 10,
   prepare: false,
-  // 启用连接重试
   connection: {
-    application_name: "kailex-web",
+    application_name: "nextjs-admin-template",
   },
 });
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(dbClient, { schema });

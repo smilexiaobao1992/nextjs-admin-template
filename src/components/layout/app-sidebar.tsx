@@ -1,204 +1,247 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  FolderKanban,
-  FileText,
-  Users,
-  Package,
-} from "lucide-react";
+import { createElement, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { resolveMenuIcon } from "@/components/layout/menu-icons";
+import { cn } from "@/lib/utils";
+import type { NavMenuItem } from "@/lib/rbac/permissions";
 
-interface NavItem {
-  name: string;
-  href?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children?: NavItem[];
+function MenuIcon({ name, className }: { name: string | null | undefined; className?: string }) {
+  return createElement(resolveMenuIcon(name), {
+    "aria-hidden": true,
+    className,
+  });
 }
 
-// 示例导航配置 - 请根据实际业务需求修改
-const navItems: NavItem[] = [
-  { name: "Dashboard", href: "/app", icon: LayoutDashboard },
-  {
-    name: "示例模块",
-    icon: FolderKanban,
-    children: [
-      { name: "内容管理", href: "/app/content", icon: FileText },
-      { name: "用户管理", href: "/app/users", icon: Users },
-      { name: "产品管理", href: "/app/products", icon: Package },
-    ],
-  },
-];
+type AppSidebarProps = {
+  items: NavMenuItem[];
+  collapsed?: boolean;
+  onToggle?: () => void;
+  onNavigate?: () => void;
+  label?: string;
+};
 
-export default function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
-  const pathname = usePathname();
+function isPathActive(pathname: string, href: string) {
+  if (!href) {
+    return false;
+  }
+  return pathname === href || (href !== "/app" && pathname.startsWith(`${href}/`));
+}
 
-  // 切换子菜单展开/收起
-  const toggleMenu = (name: string) => {
-    setExpandedMenus((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(name)) {
-        newSet.delete(name);
-      } else {
-        newSet.add(name);
-      }
-      return newSet;
-    });
-  };
+function isGroupActive(pathname: string, item: NavMenuItem): boolean {
+  if (isPathActive(pathname, item.href)) {
+    return true;
+  }
+  return Boolean(item.children?.some((child) => isGroupActive(pathname, child)));
+}
 
-  // 检查菜单项是否激活
-  const isActive = (href: string) => {
-    return pathname === href || (href !== "/app" && pathname.startsWith(href + "/"));
-  };
+function NavLink({
+  item,
+  pathname,
+  collapsed,
+  onNavigate,
+  nested = false,
+}: {
+  item: NavMenuItem;
+  pathname: string;
+  collapsed?: boolean;
+  onNavigate?: () => void;
+  nested?: boolean;
+}) {
+  const active = isPathActive(pathname, item.href);
 
-  // 检查子菜单是否有激活项
-  const hasActiveChild = (item: NavItem) => {
-    if (!item.children) return false;
-    return item.children.some((child) => child.href && isActive(child.href));
-  };
+  if (!item.href) {
+    return null;
+  }
 
   return (
-    <div
-      className={`fixed left-0 top-0 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 z-40 ${
-        collapsed ? "w-16" : "w-56"
-      }`}
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? item.title : undefined}
+      title={collapsed ? item.title : undefined}
+      className={cn(
+        "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        collapsed && "justify-center px-0",
+        nested && !collapsed && "pl-10",
+      )}
     >
-      {/* 折叠按钮 */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm z-50"
+      <MenuIcon name={item.icon} className="size-4 shrink-0" />
+      {collapsed ? null : <span className="min-w-0 truncate">{item.title}</span>}
+    </Link>
+  );
+}
+
+function NavGroup({
+  item,
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavMenuItem;
+  pathname: string;
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  const children = item.children ?? [];
+  const groupActive = isGroupActive(pathname, item);
+  const [open, setOpen] = useState(groupActive);
+  const [closedOnPath, setClosedOnPath] = useState<string | null>(null);
+  const expanded = open || (groupActive && closedOnPath !== pathname);
+
+  if (children.length === 0) {
+    return <NavLink item={item} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />;
+  }
+
+  if (collapsed) {
+    // Collapsed rail: jump to the first child (or parent href if present).
+    const target = item.href || children[0]?.href || "/app";
+    return (
+      <Link
+        href={target}
+        onClick={onNavigate}
+        aria-label={item.title}
+        title={item.title}
+        className={cn(
+          "flex min-h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          groupActive
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        )}
       >
-        {collapsed ? (
-          <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        ) : (
-          <ChevronLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+        <MenuIcon name={item.icon} className="size-4 shrink-0" />
+      </Link>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div
+        className={cn(
+          "flex min-h-10 items-center rounded-lg text-sm font-medium transition-colors",
+          groupActive
+            ? "bg-accent text-accent-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
         )}
-      </button>
-
-      {/* Logo 区域 - 请修改为你的项目名称 */}
-      <div className="h-16 flex items-center justify-center border-b border-gray-200 dark:border-gray-700">
-        {!collapsed ? (
-          <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">Admin系统</h1>
+      >
+        {item.href ? (
+          <Link
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={isPathActive(pathname, item.href) ? "page" : undefined}
+            className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-l-lg px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MenuIcon name={item.icon} className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
+          </Link>
         ) : (
-          <span className="text-xl font-bold text-blue-600 dark:text-blue-400">A</span>
+          <span className="flex min-h-10 min-w-0 flex-1 items-center gap-3 px-3">
+            <MenuIcon name={item.icon} className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
+          </span>
         )}
-      </div>
-
-      {/* 导航菜单 */}
-      <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 8rem)" }}>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const hasChildren = item.children && item.children.length > 0;
-          const isExpanded = expandedMenus.has(item.name);
-          const hasActive = hasActiveChild(item);
-          const isDirectActive = item.href && isActive(item.href);
-
-          // 一级菜单项（无子菜单）
-          if (!hasChildren) {
-            return (
-              <Link
-                key={item.name}
-                href={item.href!}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isDirectActive
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                }`}
-                title={collapsed ? item.name : ""}
-              >
-                <Icon className={`w-5 h-5 flex-shrink-0 ${isDirectActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"}`} />
-                {!collapsed && (
-                  <span className="font-medium text-sm">{item.name}</span>
-                )}
-              </Link>
-            );
-          }
-
-          // 一级菜单项（有子菜单）
-          return (
-            <div key={item.name}>
-              {/* 父菜单 */}
-              <button
-                onClick={() => !collapsed && toggleMenu(item.name)}
-                className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  hasActive
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                }`}
-                title={collapsed ? item.name : ""}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 flex-shrink-0 ${hasActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"}`} />
-                  {!collapsed && (
-                    <span className="font-medium text-sm">{item.name}</span>
-                  )}
-                </div>
-                {!collapsed && (
-                  <ChevronDown
-                    className={`w-4 h-4 flex-shrink-0 transition-transform ${
-                      isExpanded ? "rotate-180" : ""
-                    }`}
-                  />
-                )}
-              </button>
-
-              {/* 子菜单 */}
-              {!collapsed && isExpanded && (
-                <div className="ml-6 mt-1 space-y-1">
-                  {item.children?.map((child) => {
-                    const ChildIcon = child.icon;
-                    const isChildActive = child.href && isActive(child.href);
-
-                    return (
-                      <Link
-                        key={child.name}
-                        href={child.href!}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                          isChildActive
-                            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        }`}
-                      >
-                        <ChildIcon className={`w-4 h-4 flex-shrink-0 ${isChildActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
-                        <span className="text-sm">{child.name}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* 底部设置 */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200 dark:border-gray-700">
-        <Link
-          href="/app/settings"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-            pathname === "/app/settings"
-              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-              : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
-          title={collapsed ? "设置" : ""}
+        <button
+          type="button"
+          onClick={() => {
+            if (expanded) {
+              setOpen(false);
+              setClosedOnPath(pathname);
+            } else {
+              setOpen(true);
+              setClosedOnPath(null);
+            }
+          }}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "收起" : "展开"}${item.title}`}
+          className="flex size-10 shrink-0 items-center justify-center rounded-r-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Settings className={`w-5 h-5 flex-shrink-0 ${
-            pathname === "/app/settings" ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"
-          }`} />
-          {!collapsed && (
-            <span className="font-medium text-sm">设置</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn("size-4 transition-transform", expanded ? "rotate-0" : "-rotate-90")}
+          />
+        </button>
+      </div>
+      {expanded ? (
+        <div className="space-y-1" role="group" aria-label={item.title}>
+          {children.map((child) => (
+            <NavLink
+              key={child.id}
+              item={child}
+              pathname={pathname}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+              nested
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function AppSidebar({
+  items,
+  collapsed = false,
+  onToggle,
+  onNavigate,
+  label = "主导航",
+}: AppSidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <div className="flex h-full flex-col bg-card">
+      <div className={cn("relative flex h-16 items-center border-b", collapsed ? "justify-center px-2" : "px-4")}>
+        <Link
+          href="/app"
+          onClick={onNavigate}
+          aria-label={collapsed ? "Admin Template 首页" : undefined}
+          className="flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ShieldCheck aria-hidden="true" className="size-5" />
+          </span>
+          {collapsed ? null : (
+            <span className="truncate text-sm font-semibold tracking-tight">Admin Template</span>
           )}
         </Link>
+
+        {onToggle ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+            title={collapsed ? "展开侧栏" : "收起侧栏"}
+            onClick={onToggle}
+            className="absolute right-0 top-1/2 z-10 h-10 w-10 -translate-y-1/2 translate-x-1/2 rounded-full bg-card shadow-sm"
+          >
+            {collapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
+          </Button>
+        ) : null}
       </div>
+
+      <nav aria-label={label} className="flex-1 space-y-1 overflow-y-auto p-3">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <NavGroup
+              key={item.id}
+              item={item}
+              pathname={pathname}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+            />
+          ))
+        ) : collapsed ? null : (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">暂无可访问菜单</p>
+        )}
+      </nav>
     </div>
   );
 }
