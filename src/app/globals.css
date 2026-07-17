@@ -91,6 +91,11 @@ a {
   touch-action: manipulation;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

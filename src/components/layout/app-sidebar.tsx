@@ -181,7 +181,7 @@ function NavGroup({
         ) : null}
       </div>
       {expanded ? (
-        <div className="ml-4 space-y-1 border-l border-sidebar-border pl-1" role="group" aria-label={item.title}>
+        <div className="ml-4 space-y-1 pl-1" role="group" aria-label={item.title}>
           {children.map((child) => (
             <NavLink
               key={child.id}
@@ -209,30 +209,30 @@ export default function AppSidebar({
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className={cn("relative flex h-16 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-4")}>
+      <div className={cn("relative flex h-16 items-center", collapsed ? "justify-center px-2" : "px-4")}>
         <Link
           href="/app"
           onClick={onNavigate}
-          aria-label={collapsed ? "Admin Template 首页" : undefined}
+          aria-label={collapsed ? "管理中心首页" : undefined}
           className="flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ShieldCheck aria-hidden="true" className="size-5" />
           </span>
           {collapsed ? null : (
-            <span className="truncate text-sm font-semibold tracking-[-0.012em] text-sidebar-foreground">Admin Template</span>
+            <span className="truncate text-sm font-semibold tracking-[-0.012em] text-sidebar-foreground">管理中心</span>
           )}
         </Link>
 
         {onToggle ? (
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
             aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
             title={collapsed ? "展开侧栏" : "收起侧栏"}
             onClick={onToggle}
-            className="absolute right-0 top-1/2 z-10 h-10 w-10 -translate-y-1/2 translate-x-1/2 rounded-full border-sidebar-border bg-sidebar text-sidebar-muted shadow-[0_6px_18px_rgba(18,16,14,0.28)] hover:bg-primary hover:text-primary-foreground focus-visible:ring-sidebar-ring"
+            className="absolute right-0 top-1/2 z-10 h-10 w-10 -translate-y-1/2 translate-x-1/2 rounded-full bg-sidebar-accent text-sidebar-muted shadow-[0_6px_18px_rgba(18,16,14,0.28)] hover:bg-primary hover:text-primary-foreground focus-visible:ring-sidebar-ring"
           >
             {collapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
           </Button>
