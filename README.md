@@ -4,6 +4,16 @@
 
 默认界面为**简体中文**（`lang="zh-CN"`）。需要多语言时，在业务层自行接入 i18n。
 
+## 界面预览
+
+### 工作台
+
+![管理中心工作台](docs/images/admin-dashboard.jpg)
+
+### 登录页
+
+![管理中心登录页](docs/images/admin-login.jpg)
+
 ## 技术栈
 
 - Next.js 16.2、React 19、TypeScript、Tailwind CSS 4
