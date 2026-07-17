@@ -12,7 +12,7 @@
 
 ### 登录页
 
-![管理中心登录页](docs/images/admin-login.jpg)
+![管理中心登录页](docs/images/admin-login.png)
 
 ## 技术栈
 
