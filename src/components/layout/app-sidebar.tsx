@@ -95,6 +95,15 @@ function NavGroup({
   const [open, setOpen] = useState(groupActive);
   const [closedOnPath, setClosedOnPath] = useState<string | null>(null);
   const expanded = open || (groupActive && closedOnPath !== pathname);
+  const toggleExpanded = () => {
+    if (expanded) {
+      setOpen(false);
+      setClosedOnPath(pathname);
+    } else {
+      setOpen(true);
+      setClosedOnPath(null);
+    }
+  };
 
   if (children.length === 0) {
     return <NavLink item={item} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />;
@@ -142,31 +151,34 @@ function NavGroup({
             <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
           </Link>
         ) : (
-          <span className="flex min-h-10 min-w-0 flex-1 items-center gap-3 px-3">
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+            className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 text-left active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <MenuIcon name={item.icon} className="size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
-          </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={cn("size-4 shrink-0 transition-transform", expanded ? "rotate-0" : "-rotate-90")}
+            />
+          </button>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            if (expanded) {
-              setOpen(false);
-              setClosedOnPath(pathname);
-            } else {
-              setOpen(true);
-              setClosedOnPath(null);
-            }
-          }}
-          aria-expanded={expanded}
-          aria-label={`${expanded ? "收起" : "展开"}${item.title}`}
-          className="flex size-10 shrink-0 items-center justify-center rounded-r-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ChevronDown
-            aria-hidden="true"
-            className={cn("size-4 transition-transform", expanded ? "rotate-0" : "-rotate-90")}
-          />
-        </button>
+        {item.href ? (
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "收起" : "展开"}${item.title}`}
+            className="flex size-10 shrink-0 items-center justify-center rounded-r-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronDown
+              aria-hidden="true"
+              className={cn("size-4 transition-transform", expanded ? "rotate-0" : "-rotate-90")}
+            />
+          </button>
+        ) : null}
       </div>
       {expanded ? (
         <div className="space-y-1" role="group" aria-label={item.title}>
