@@ -64,7 +64,7 @@ export default async function MenusPage({
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">菜单</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">菜单管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧维护导航树，右侧编辑选中菜单。只支持一级分组和二级菜单，菜单权限只控制可见性，页面仍需服务端鉴权。
+          维护后台导航的名称、层级、顺序和访问范围。一级菜单可作为分组，二级菜单用于打开具体页面。
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export default async function MenusPage({
                 </span>
                 <div>
                   <h2 className="font-semibold">新增菜单</h2>
-                  <p className="text-sm text-muted-foreground">分组路径可留空，二级菜单选择一个一级菜单作为上级。</p>
+                  <p className="text-sm text-muted-foreground">分组菜单可以不填写路径，页面菜单需要选择上级菜单。</p>
                 </div>
               </div>
               <MenuForm

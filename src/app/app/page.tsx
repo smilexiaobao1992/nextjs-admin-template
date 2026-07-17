@@ -1,15 +1,15 @@
-import { BookOpen, Database, LockKeyhole } from "lucide-react";
+import { BellRing, ShieldCheck, UserRoundCog } from "lucide-react";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const { notice } = await searchParams;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div className="max-w-2xl">
-        <p className="mb-2 text-sm font-medium text-primary">工作区概览</p>
-        <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em] sm:text-4xl">后台基础已经就绪</h1>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">工作台</p>
+        <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em] sm:text-4xl">欢迎使用管理中心</h1>
         <p className="mt-3 text-pretty text-muted-foreground">
-          从认证、权限和数据库迁移开始扩展你的业务，不需要先拆除示例业务代码。
+          通过左侧导航进入可用模块，系统会根据你的角色显示对应功能。
         </p>
       </div>
 
@@ -19,16 +19,16 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         </p>
       ) : null}
 
-      <section aria-labelledby="foundation-title">
-        <h2 id="foundation-title" className="text-lg font-semibold tracking-[-0.012em]">模板基线</h2>
-        <div className="mt-4 divide-y rounded-xl bg-card shadow-[0_1px_3px_rgba(0,0,0,0.10)]">
+      <section aria-labelledby="workspace-guide-title">
+        <h2 id="workspace-guide-title" className="text-lg font-semibold tracking-[-0.012em]">使用提示</h2>
+        <div className="mt-4 divide-y divide-border/70 rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
           {[
-            { icon: LockKeyhole, title: "认证与动态 RBAC", detail: "Better Auth 会话 + 可管理的角色 / 权限 / 菜单" },
-            { icon: Database, title: "数据层", detail: "Drizzle schema、版本化迁移、Supabase serverless 连接" },
-            { icon: BookOpen, title: "工程规范", detail: "类型检查、自动化测试、CI 与 UI 规范文档" },
+            { icon: ShieldCheck, title: "权限范围", detail: "可见菜单和操作由角色决定，如需调整请联系系统管理员。" },
+            { icon: UserRoundCog, title: "账号信息", detail: "请使用本人账号处理工作，不要与他人共享登录凭据。" },
+            { icon: BellRing, title: "操作提醒", detail: "重要修改提交后会立即生效，保存前请确认当前选择。" },
           ].map((item) => (
             <div key={item.title} className="flex gap-4 px-4 py-5 sm:px-5">
-              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
                 <item.icon aria-hidden="true" className="size-4" />
               </span>
               <div>

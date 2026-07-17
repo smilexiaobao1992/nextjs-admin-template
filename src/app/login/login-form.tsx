@@ -50,20 +50,20 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <span className="mb-4 inline-flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <LayoutDashboard aria-hidden="true" className="size-5" />
           </span>
-          <h1 className="text-2xl font-semibold tracking-tight">Admin Template</h1>
-          <p className="mt-2 text-sm text-muted-foreground">安全、清晰的 Next.js 管理后台起点</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.012em]">管理中心</h1>
+          <p className="mt-2 text-sm text-muted-foreground">统一管理账号、角色和访问权限</p>
         </div>
 
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">登录</CardTitle>
-            <CardDescription>使用管理员为你创建的账号继续</CardDescription>
+            <CardDescription>请输入工作邮箱和密码</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSubmit}>
@@ -107,7 +107,7 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
         </Card>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          默认关闭公开注册，请联系管理员创建账号。
+          如需开通账号或重置密码，请联系系统管理员。
         </p>
       </div>
     </main>

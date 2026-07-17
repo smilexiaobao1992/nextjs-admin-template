@@ -39,7 +39,7 @@ export default async function PermissionsPage({
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">权限</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">权限管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧按资源维护权限目录，右侧查看或编辑具体权限点。业务代码使用同一 key 做服务端鉴权。
+          按资源维护系统权限，控制不同角色可访问的页面和操作。
         </p>
       </div>
 

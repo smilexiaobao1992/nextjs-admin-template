@@ -41,7 +41,7 @@ export default async function RolesPage({
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">角色</p>
         <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">角色管理</h1>
         <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          左侧选择角色，右侧按资源分配操作权限。系统管理员自动拥有所有权限。
+          为不同岗位设置菜单和操作权限。系统管理员始终拥有全部权限。
         </p>
       </div>
 
@@ -105,7 +105,7 @@ export default async function RolesPage({
                 </span>
                 <div>
                   <h2 className="font-semibold">新增角色</h2>
-                  <p className="text-sm text-muted-foreground">Key 创建后不可修改，用于用户和服务端授权。</p>
+                  <p className="text-sm text-muted-foreground">角色标识创建后不可修改，请使用简短、稳定的英文名称。</p>
                 </div>
               </div>
               <GuardedEditForm action={createRoleAction} className="space-y-6">
@@ -211,7 +211,7 @@ function RoleDetail({
           </div>
           {isAdmin ? (
             <div className="rounded-lg bg-secondary/70 px-4 py-3 text-sm text-secondary-foreground">
-              系统管理员不需要逐项勾选，新增权限也会自动生效。
+              系统管理员始终拥有全部权限，无需逐项配置。
             </div>
           ) : (
             <PermissionMatrix permissions={permissions} selectedIds={selectedIds} />
