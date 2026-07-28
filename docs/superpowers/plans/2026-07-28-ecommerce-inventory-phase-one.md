@@ -82,11 +82,12 @@
 
 ### Warehouse and inventory
 
-- `src/lib/warehouses/manage.ts`: create/update/default warehouse rules and default location creation.
+- `src/lib/warehouses/manage.ts`: create/update/default warehouse rules plus location create/update/disable.
 - `src/lib/warehouses/manage.test.ts`: pure validation/default behavior tests.
 - `src/features/warehouses/queries.ts`: searchable paginated warehouse/location reads.
 - `src/features/warehouses/actions.ts`: permission-checked actions.
 - `src/features/warehouses/components/warehouse-list.tsx`: warehouse UI.
+- `src/features/warehouses/components/location-list.tsx`: custom location UI per warehouse.
 - `src/app/app/warehouses/page.tsx`: warehouse page.
 - `src/lib/inventory/document-rules.ts`: document behavior matrix and signed effects.
 - `src/lib/inventory/document-rules.test.ts`: each document type and bundle expansion tests.
@@ -235,7 +236,7 @@ Run:
 npm run db:generate -- --name ecommerce_inventory_core
 ```
 
-Expected: `drizzle/0001_ecommerce_inventory_core.sql` plus updated journal/snapshot. Inspect the SQL before applying. Append idempotent seed inserts for phase-one permission keys, nested menus, `MAIN` default warehouse, and its `DEFAULT` location.
+Expected: `drizzle/0001_ecommerce_inventory_core.sql` plus updated journal/snapshot. Inspect the SQL before applying. Append idempotent seed inserts for phase-one permission keys, nested menus, the base unit `件`, `MAIN` default warehouse, and its `DEFAULT` location. Unit seeding belongs to this migration, not runtime startup.
 
 - [ ] **Step 5: Migrate and verify**
 
@@ -356,7 +357,7 @@ git commit -m "feat: add reusable list pagination"
 
 - [ ] **Step 1: Write failing catalog and storage tests**
 
-Cover normalized codes, duplicate component rejection, nested-bundle rejection, positive component quantities, JPG/PNG/WebP validation, 2MB limit, storage-prefix delete guard, path-to-public-URL resolution, and missing-storage configuration.
+Cover normalized codes, duplicate component rejection, nested-bundle rejection, positive component quantities, JPG/PNG/WebP validation, 2MB limit, storage-prefix delete guard, path-to-public-URL resolution, missing-storage configuration, newly uploaded object cleanup after product-save failure, old-object deletion only after replacement commit, and clearing the database path before deleting a removed main image.
 
 - [ ] **Step 2: Run focused tests and confirm failure**
 
@@ -370,11 +371,11 @@ Expected: FAIL because the modules do not exist.
 
 - [ ] **Step 3: Implement catalog transactions**
 
-Create/update/disable products, categories, units, SKUs, and bundle components inside transactions. Seed the base unit `件`, but allow authorized users to add/rename/disable units and categories. A disabled unit/category remains visible on historical products and cannot be selected for new SKUs/products. Recheck uniqueness and nested-bundle rules server-side. Write audit events in the same transaction. Never delete historical catalog rows referenced by inventory documents.
+Create/update/disable products, categories, units, SKUs, and bundle components inside transactions. Allow authorized users to add/rename/disable units and categories. A disabled unit/category remains visible on historical products and cannot be selected for new SKUs/products. Recheck uniqueness, nested-bundle rules, and active category/unit state server-side. Write audit events in the same transaction. Never delete historical catalog rows referenced by inventory documents.
 
 - [ ] **Step 4: Implement image storage by adapting the proven boundary**
 
-Port the small server-storage, client-upload, and preview pattern from `kailex/web`, replacing its permission middleware with `requirePermission("catalog:write")`. Store only paths under `ecommerce-inventory/products/`. Upload new image first, save the product, delete the new image on save failure, and delete the old image only after a successful replacement. Audit upload, replacement, deletion, cleanup failure, and permission denial without recording binary content or service credentials.
+Port the small server-storage, client-upload, and preview pattern from `kailex/web`, replacing its permission middleware with `requirePermission("catalog:write")`. Store only paths under `ecommerce-inventory/products/`. Put upload/save/cleanup ordering behind a testable coordinator with an injected storage adapter: upload new image first, save the product, delete the new image on save failure, and delete the old image only after a successful replacement. Removing a main image first commits a null database path, then deletes the old object. Audit upload, replacement, deletion, cleanup failure, and permission denial without recording binary content or service credentials.
 
 - [ ] **Step 5: Implement the catalog list and form**
 
@@ -453,7 +454,7 @@ git commit -m "feat: add catalog bulk import"
 
 - [ ] **Step 1: Write failing warehouse rule tests**
 
-Cover normalized warehouse/location codes, automatic `DEFAULT` location, one active default warehouse, default reassignment, and rejection of disabling the final active default.
+Cover normalized warehouse/location codes, automatic `DEFAULT` location, custom location creation/update/disable, duplicate location rejection within a warehouse, one active default warehouse, default reassignment, rejection of disabling the final active default, and rejection of disabling a location with nonzero balance.
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -461,11 +462,11 @@ Run: `npm run test -- src/lib/warehouses/manage.test.ts`
 
 - [ ] **Step 3: Implement transactional warehouse management and audit**
 
-Lock warehouse rows while changing defaults. Create `DEFAULT` location in the same transaction as a warehouse. Never delete a location referenced by balances or movements.
+Lock warehouse rows while changing defaults. Create `DEFAULT` location in the same transaction as a warehouse. Support authorized creation, rename, and disable of custom locations with audit events. `DEFAULT` cannot be deleted; any location referenced by balances/movements cannot be deleted; a location with nonzero balance cannot be disabled.
 
 - [ ] **Step 4: Build searchable paginated warehouse UI**
 
-Show default/status labels, location count, single main action, accessible dialogs/forms, and server-side page/search/status filters.
+Show default/status labels, location count, single main action, accessible dialogs/forms, and server-side page/search/status filters. Each warehouse links to its custom-location list with create/edit/disable actions, keyword/status filters, and page sizes 20/50/100.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -484,7 +485,7 @@ git commit -m "feat: add warehouse management"
 
 - [ ] **Step 1: Write failing document-rule tests**
 
-Cover every matrix row from spec section 7.1, signed effects, required source/target locations, no same-location transfer, no negative count, rejection of quantity precision beyond four decimals, bundle allowed only on outbound, bundle component aggregation, insufficient component details, and a new-balance row plan.
+Cover every matrix row from spec section 7.1, signed effects, required source/target locations, no same-location transfer, no negative count, rejection of quantity precision beyond four decimals, bundle allowed only on outbound, bundle component aggregation, insufficient component details, inactive SKU/warehouse/location rejection, and a new-balance row plan.
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -508,15 +509,15 @@ export function planStockEffects(input: DocumentDraft, bundles: BundleSnapshot[]
 
 - [ ] **Step 4: Implement transactional posting**
 
-Inside one database transaction: lock document, reject non-draft state, expand bundle snapshot, then insert every missing balance key with zero using `INSERT ... ON CONFLICT DO NOTHING`. After all keys exist, select them `FOR UPDATE` in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event. This insert-then-lock protocol is mandatory because `FOR UPDATE` cannot lock a missing row.
+Inside one database transaction: lock document, reject non-draft state, then re-read every SKU, warehouse, and location referenced by the draft and reject any inactive object even if it was active when the draft was created. Expand bundle snapshot, insert every missing balance key with zero using `INSERT ... ON CONFLICT DO NOTHING`, then select them `FOR UPDATE` in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event. This insert-then-lock protocol is mandatory because `FOR UPDATE` cannot lock a missing row.
 
 - [ ] **Step 5: Implement one-time reversal**
 
-Lock original document, reject non-posted/reversal documents, insert one posted reversal with exact negated original movements, update balances, set original to reversed, and write audit in one transaction. Enforce unique `reversal_of_document_id` in PostgreSQL.
+Lock original document, reject non-posted/reversal documents, plan exact negated original movements, and run those effects through the same missing-row insert, stable `FOR UPDATE` lock, active-object validation, and negative-balance check as normal posting. This deliberately blocks reversing an inbound whose stock has already been consumed. Insert one posted reversal, compute every `balance_after` from locked balances, set original to reversed, and write audit in one transaction. Enforce unique `reversal_of_document_id` in PostgreSQL.
 
 - [ ] **Step 6: Add database-backed verification cases**
 
-Extend `scripts/verify-inventory-database.ts` with commit-and-rollback-safe cases for insufficient stock, transfer conservation, duplicate reversal, balance equals movement sum, and quantity-scale rejection. Use two independent database connections and a barrier to prove concurrent deductions cannot both spend the same stock; expect one post and one insufficient-stock result with a non-negative final balance. Force a failure after balance locking and verify document, movement, balance, and audit changes all roll back.
+Extend `scripts/verify-inventory-database.ts` with commit-and-rollback-safe cases for insufficient stock, transfer conservation, duplicate reversal, balance equals movement sum, quantity-scale rejection, inactive object rejection, and reversing an already-consumed inbound. Use two independent database connections and a barrier to prove concurrent deductions cannot both spend the same stock; expect one post and one insufficient-stock result with a non-negative final balance. Add a second concurrency case where reversal competes with outbound posting and prove serializable non-negative results. Force a failure after balance locking and verify document, movement, balance, and audit changes all roll back.
 
 - [ ] **Step 7: Implement bundle sellable quantity**
 
@@ -548,7 +549,7 @@ Stock filters: keyword, warehouse, location, active status, in-stock status. Doc
 
 - [ ] **Step 3: Implement document workflows**
 
-Use a grouped draft form with default warehouse/location, line add/remove, bundle preview, affected-stock preview, field errors, duplicate-submit protection, and an explicit posting confirmation listing affected SKUs/locations/quantities.
+Use a grouped draft form with default warehouse/location, line add/remove, bundle preview, affected-stock preview, field errors, duplicate-submit protection, and an explicit posting confirmation listing affected SKUs/locations/quantities. Draft create and every draft edit must run through audited server actions; tests assert actor, before/after payload, and no audit on a transaction that fails before mutation.
 
 - [ ] **Step 4: Implement list/detail traceability**
 
@@ -609,7 +610,7 @@ git commit -m "feat: add inventory dashboard"
 
 - [ ] **Step 1: Run database verification from a clean database**
 
-Create a temporary verification database with an explicit narrow name, apply migrations, run both verification scripts, then drop only that verified temporary database.
+Create a temporary verification database with an explicit narrow name, apply migrations, then run `npm run db:verify`, `npm run db:verify:inventory`, and `npm run db:verify:catalog-import` against that fresh database. Drop only that explicitly verified temporary database after all three pass.
 
 - [ ] **Step 2: Run the complete quality gate**
 
@@ -622,7 +623,7 @@ Expected: lint, typecheck, all Vitest files, and production build pass.
 
 - [ ] **Step 3: Start the app and exercise the real phase-one path**
 
-Create a local admin without passing its password on the command line. Create a non-admin role with `catalog:read`, `warehouses:read`, `inventory:read`, and `inventory:create` but no `inventory:post`, then verify both hidden UI and direct server rejection. Verify in browser: login → dashboard → category/unit maintenance → product create/real image upload → catalog import/history → warehouse create → inbound post → bundle availability/outbound → insufficient stock rejection → transfer → stocktake → document detail → reversal links → audit log.
+Create a local admin without passing its password on the command line. Create a non-admin role with `catalog:read`, `warehouses:read`, `inventory:read`, and `inventory:create` but no `inventory:post`, then verify both hidden UI and direct server rejection. Verify in browser: login → dashboard → category/unit maintenance → product create → real image upload → replacement deletes old image → removal clears database path and storage object → forced save failure cleans the newly uploaded image → catalog import/history → warehouse/custom location create → inbound post → BOM configuration → bundle availability/outbound → insufficient stock rejection → transfer → stocktake → document detail → reversal links → audit log.
 
 - [ ] **Step 4: Verify list and responsive behavior**
 
@@ -634,7 +635,7 @@ Use representative catalog, stock, document, movement, and audit queries with `E
 
 - [ ] **Step 6: Update documentation and commit fixes**
 
-Document local setup, storage configuration, image limits, import template, document status model, and verification commands.
+Document local setup, storage configuration, image limits, import template, document status model, and verification commands. Run `git status --short`; if verification produced source fixes, stage each reported source path explicitly and commit those fixes first. Then stage only the two documentation files below; never use `git add .`.
 
 ```bash
 git status --short
