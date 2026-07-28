@@ -44,6 +44,7 @@
 - `src/components/ui/list-pagination.tsx`: reusable page navigation.
 - `src/components/ui/search-toolbar.tsx`: URL-backed search/filter form.
 - `src/lib/audit/write.ts`: append audit event within the caller's transaction.
+- `src/lib/audit/with-audit.ts`: record successful writes atomically and failed attempts after rollback.
 - `src/features/audit/queries.ts`: cursor-paginated audit reads.
 - `src/features/audit/components/audit-list.tsx`: read-only audit table.
 - `src/app/app/audit/page.tsx`: protected operation log page.
@@ -53,10 +54,12 @@
 - `src/lib/catalog/validate.ts`: normalized product/SKU/BOM validation.
 - `src/lib/catalog/validate.test.ts`: validation and no nested-bundle rules.
 - `src/lib/catalog/manage.ts`: catalog transactions and audit calls.
+- `src/lib/catalog/reference-data.ts`: category and unit create/update/disable rules.
 - `src/features/catalog/queries.ts`: server-side search/filter/sort/page queries.
 - `src/features/catalog/actions.ts`: permission-checked product/SKU/BOM actions.
 - `src/features/catalog/components/product-list.tsx`: thumbnail list and controls.
 - `src/features/catalog/components/product-form.tsx`: accessible grouped editor.
+- `src/features/catalog/components/reference-data-manager.tsx`: category and unit maintenance.
 - `src/app/app/catalog/page.tsx`: catalog route.
 - `src/lib/storage/product-images.ts`: storage configuration, path validation, upload/delete/URL resolution.
 - `src/lib/storage/product-images.test.ts`: type/size/prefix and missing-config tests.
@@ -72,7 +75,10 @@
 - `src/lib/imports/confirm-catalog-import.ts`: atomic confirm and audit.
 - `src/features/imports/catalog-actions.ts`: upload/confirm actions.
 - `src/features/imports/components/catalog-import-wizard.tsx`: upload, validate, review, confirm, result workflow.
+- `src/features/imports/components/catalog-import-history.tsx`: searchable paginated import batches.
 - `src/app/app/catalog/import/page.tsx`: protected import page.
+- `src/app/app/catalog/imports/page.tsx`: protected import-history page.
+- `scripts/verify-catalog-import-database.ts`: atomic confirm and idempotency database checks.
 
 ### Warehouse and inventory
 
@@ -84,6 +90,8 @@
 - `src/app/app/warehouses/page.tsx`: warehouse page.
 - `src/lib/inventory/document-rules.ts`: document behavior matrix and signed effects.
 - `src/lib/inventory/document-rules.test.ts`: each document type and bundle expansion tests.
+- `src/lib/inventory/bundle-availability.ts`: sellable bundle quantity from component stock.
+- `src/lib/inventory/bundle-availability.test.ts`: limiting component and zero-stock cases.
 - `src/lib/inventory/post-document.ts`: single-transaction posting and row locks.
 - `src/lib/inventory/reverse-document.ts`: one-time mirrored reversal.
 - `src/lib/inventory/errors.ts`: stable business error codes.
@@ -92,9 +100,11 @@
 - `src/features/inventory/components/stock-list.tsx`: stock list with server filters.
 - `src/features/inventory/components/document-form.tsx`: draft document editor.
 - `src/features/inventory/components/document-list.tsx`: documents and status actions.
+- `src/features/inventory/components/document-detail.tsx`: immutable detail, movements, and reversal links.
 - `src/app/app/inventory/page.tsx`: current stock page.
 - `src/app/app/inventory/documents/page.tsx`: stock document list.
 - `src/app/app/inventory/documents/new/page.tsx`: document creation.
+- `src/app/app/inventory/documents/[id]/page.tsx`: traceable document detail.
 - `src/app/app/inventory/movements/page.tsx`: cursor-paginated ledger.
 
 ### Dashboard and final verification
@@ -156,7 +166,9 @@ Expected: `package.json` and `package-lock.json` update; no other new runtime de
 
 - [ ] **Step 5: Create an independent local database**
 
-Run read-only existence checks first. If `ecommerce_inventory` is absent, create it with role `xujunbao`. Create `.env.local` by copying the template values without printing secrets, then replace only database host/port/name with `localhost:5432/ecommerce_inventory`, generate a new Better Auth secret, and set `BETTER_AUTH_URL=http://localhost:3000`.
+Run read-only existence checks first. If `ecommerce_inventory` is absent, create it with role `xujunbao`. Create `.env.local` by copying the template values without printing secrets, then set both database URLs to role `xujunbao` at `localhost:5432/ecommerce_inventory`, generate a new Better Auth secret, and set `BETTER_AUTH_URL=http://localhost:3000`.
+
+Copy only `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the existing local `kailex/web` environment when both are present; never print either value. Use the service role to inspect the existing `inventory-images` bucket. If absent, create that one bucket as public with a 2MB limit and JPG/PNG/WebP MIME allowlist. If present but private or incompatible, stop and correct the bucket policy explicitly before image acceptance rather than silently storing broken URLs.
 
 Run:
 
@@ -190,6 +202,18 @@ git commit -m "chore: initialize ecommerce inventory project"
 - [ ] **Step 1: Write the schema constraint verification first**
 
 Add a `db:verify:inventory` script and verification cases for unique SKU code, positive BOM quantity, no duplicate components, one default warehouse, required location, non-negative balance, unique reversal, and seeded permissions/menus/default warehouse.
+
+Seed this complete permission set:
+
+```text
+dashboard:view
+catalog:read, catalog:write, catalog:import
+warehouses:read, warehouses:write
+inventory:read, inventory:create, inventory:post, inventory:reverse, inventory:stocktake
+audit:read
+```
+
+The system `admin` continues to receive all permissions through its role-key shortcut. The default `member` keeps only `dashboard:view`. Menus use the corresponding read permission; Server Actions use the exact write/import/create/post/reverse permission and never trust menu visibility.
 
 - [ ] **Step 2: Run the verification and confirm it fails**
 
@@ -272,18 +296,24 @@ export type AuditInput = {
 export async function writeAuditEvent(tx: DbTransaction, input: AuditInput): Promise<void>;
 ```
 
+Add `withAuditedMutation` for actions that need both atomic success events and best-effort failure events: success audit uses the business transaction; after a rollback, a sanitized failure event is inserted separately when the database remains available.
+
 - [ ] **Step 4: Add cursor-paginated queries and protected UI**
 
 Order only by `(created_at, id)` ascending or descending. Search/filter by actor, entity type, action, result, and time range. Require `audit:read`; do not expose update/delete actions.
 
-- [ ] **Step 5: Run tests and commit**
+- [ ] **Step 5: Wire audit into existing system mutations**
+
+Modify `src/lib/auth/user-management.ts`, `src/features/users/actions.ts`, `src/lib/rbac/manage.ts`, and `src/features/rbac/actions.ts` so user, role, permission, and menu mutations receive actor/request context and write sanitized success/failure events. Add focused tests proving secrets are excluded and server-side actors are recorded.
+
+- [ ] **Step 6: Run tests and commit**
 
 Run: `npm run test -- src/lib/audit/write.test.ts`
 
 Expected: PASS.
 
 ```bash
-git add src/lib/audit src/features/audit src/app/app/audit
+git add src/lib/audit src/features/audit src/app/app/audit src/lib/auth/user-management.ts src/features/users/actions.ts src/lib/rbac/manage.ts src/features/rbac/actions.ts
 git commit -m "feat: add operation audit log"
 ```
 
@@ -340,15 +370,15 @@ Expected: FAIL because the modules do not exist.
 
 - [ ] **Step 3: Implement catalog transactions**
 
-Create/update/disable products, SKUs, and bundle components inside transactions. Recheck uniqueness and nested-bundle rules server-side. Write audit events in the same transaction. Never delete historical catalog rows referenced by inventory documents.
+Create/update/disable products, categories, units, SKUs, and bundle components inside transactions. Seed the base unit `件`, but allow authorized users to add/rename/disable units and categories. A disabled unit/category remains visible on historical products and cannot be selected for new SKUs/products. Recheck uniqueness and nested-bundle rules server-side. Write audit events in the same transaction. Never delete historical catalog rows referenced by inventory documents.
 
 - [ ] **Step 4: Implement image storage by adapting the proven boundary**
 
-Port the small server-storage, client-upload, and preview pattern from `kailex/web`, replacing its permission middleware with `requirePermission("catalog:write")`. Store only paths under `ecommerce-inventory/products/`. Upload new image first, save the product, delete the new image on save failure, and delete the old image only after a successful replacement.
+Port the small server-storage, client-upload, and preview pattern from `kailex/web`, replacing its permission middleware with `requirePermission("catalog:write")`. Store only paths under `ecommerce-inventory/products/`. Upload new image first, save the product, delete the new image on save failure, and delete the old image only after a successful replacement. Audit upload, replacement, deletion, cleanup failure, and permission denial without recording binary content or service credentials.
 
 - [ ] **Step 5: Implement the catalog list and form**
 
-Add URL-backed server search over product name, product code, SKU, and barcode. Use page sizes 20/50/100, stable sort, thumbnail/empty image treatment, field-local validation, pending buttons, and page-level success state.
+Add URL-backed server search over product name, product code, SKU, and barcode. Use page sizes 20/50/100, stable sort, thumbnail/empty image treatment, field-local validation, pending buttons, and page-level success state. Add simple category/unit maintenance to the same catalog area so the first product and import are never blocked on missing reference data.
 
 - [ ] **Step 6: Run tests, static checks, and commit**
 
@@ -367,7 +397,7 @@ git commit -m "feat: add catalog and product images"
 
 - [ ] **Step 1: Create fixtures and failing parser tests**
 
-Use in-memory CSV/XLSX buffers for valid rows, duplicate SKU, missing name/code/unit, conflicting barcode, excessive row count, extra unknown columns, and a mixed valid/error file.
+Use in-memory CSV/XLSX buffers for valid rows, duplicate SKU, missing name/code/unit, conflicting barcode, file over 10MB, more than 10,000 data rows, formula cells in required columns, parse deadline exceeded, extra unknown columns, and a mixed valid/error file.
 
 - [ ] **Step 2: Run tests and confirm failure**
 
@@ -393,23 +423,26 @@ type CatalogImportRow = {
 };
 ```
 
-Do not import image files or external image URLs from the workbook; images are uploaded through the authenticated product editor.
+Do not import image files or external image URLs from the workbook; images are uploaded through the authenticated product editor. Reject files larger than 10MB and more than 10,000 data rows. Reject formulas in required columns instead of evaluating them. Abort parsing after a 20-second monotonic deadline. Normalize/validate rows in batches of 500 so application work is bounded even though ExcelJS loads the workbook structure.
 
 - [ ] **Step 4: Implement staged, atomic confirmation**
 
-Parsing writes import job/row state only. Confirmation must reject unresolved included rows and create the selected valid products/SKUs in one transaction with one batch audit event. Re-confirming a completed job returns the existing result.
+Parsing writes import job/row state only and audits file upload plus any explicitly excluded error rows. Confirmation must reject unresolved included rows and create the selected valid products/SKUs in one transaction, inserting in batches of 500 inside that transaction, with one batch audit event. Re-confirming a completed job returns the existing result.
+
+Create `scripts/verify-catalog-import-database.ts` to run against the verification database and prove: a mid-confirm uniqueness failure rolls back all catalog rows; two confirmations of the same job return one result; and an excluded row remains traceable without being inserted.
 
 - [ ] **Step 5: Build the five-step wizard and verify**
 
-Use “上传 → 校验 → 修正/排除 → 确认 → 结果”, visible row/error counts, downloadable template/error report, and duplicate-submit protection.
+Use “上传 → 校验 → 修正/排除 → 确认 → 结果”, visible row/error counts, downloadable template/error report, and duplicate-submit protection. Add `/app/catalog/imports` with server-side keyword/status/time filters, stable sorting, page sizes 20/50/100, and links to batch rows/results.
 
 - [ ] **Step 6: Run tests and commit**
 
 ```bash
 npm run test -- src/lib/imports/catalog-parser.test.ts
+npm run db:verify:catalog-import
 npm run lint
 npm run typecheck
-git add src/lib/imports src/features/imports src/app/app/catalog/import
+git add src/lib/imports src/features/imports src/app/app/catalog/import src/app/app/catalog/imports scripts/verify-catalog-import-database.ts package.json
 git commit -m "feat: add catalog bulk import"
 ```
 
@@ -451,7 +484,7 @@ git commit -m "feat: add warehouse management"
 
 - [ ] **Step 1: Write failing document-rule tests**
 
-Cover every matrix row from spec section 7.1, signed effects, required source/target locations, no same-location transfer, no negative count, bundle allowed only on outbound, bundle component aggregation, and insufficient component details.
+Cover every matrix row from spec section 7.1, signed effects, required source/target locations, no same-location transfer, no negative count, rejection of quantity precision beyond four decimals, bundle allowed only on outbound, bundle component aggregation, insufficient component details, and a new-balance row plan.
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -459,7 +492,7 @@ Run: `npm run test -- src/lib/inventory/document-rules.test.ts`
 
 - [ ] **Step 3: Implement pure effect planning**
 
-Return deterministic, base-SKU effects sorted by `(skuId, warehouseId, locationId)`:
+Return deterministic, base-SKU effects sorted by `(skuId, warehouseId, locationId)`. Parse quantities as validated decimal strings; reject scale over four before PostgreSQL can round it:
 
 ```ts
 type StockEffect = {
@@ -475,7 +508,7 @@ export function planStockEffects(input: DocumentDraft, bundles: BundleSnapshot[]
 
 - [ ] **Step 4: Implement transactional posting**
 
-Inside one database transaction: lock document, reject non-draft state, expand bundle snapshot, lock/create balances in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event.
+Inside one database transaction: lock document, reject non-draft state, expand bundle snapshot, then insert every missing balance key with zero using `INSERT ... ON CONFLICT DO NOTHING`. After all keys exist, select them `FOR UPDATE` in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event. This insert-then-lock protocol is mandatory because `FOR UPDATE` cannot lock a missing row.
 
 - [ ] **Step 5: Implement one-time reversal**
 
@@ -483,12 +516,16 @@ Lock original document, reject non-posted/reversal documents, insert one posted 
 
 - [ ] **Step 6: Add database-backed verification cases**
 
-Extend `scripts/verify-inventory-database.ts` with commit-and-rollback-safe cases for insufficient stock, transfer conservation, duplicate reversal, and balance equals movement sum.
+Extend `scripts/verify-inventory-database.ts` with commit-and-rollback-safe cases for insufficient stock, transfer conservation, duplicate reversal, balance equals movement sum, and quantity-scale rejection. Use two independent database connections and a barrier to prove concurrent deductions cannot both spend the same stock; expect one post and one insufficient-stock result with a non-negative final balance. Force a failure after balance locking and verify document, movement, balance, and audit changes all roll back.
 
-- [ ] **Step 7: Verify and commit**
+- [ ] **Step 7: Implement bundle sellable quantity**
+
+Aggregate component stock by warehouse, divide each component balance by required quantity, floor each result, and take the minimum. Return zero when any component is missing/zero. Add tests for the limiting component, fractional component quantities, multiple locations, and no stock.
+
+- [ ] **Step 8: Verify and commit**
 
 ```bash
-npm run test -- src/lib/inventory/document-rules.test.ts
+npm run test -- src/lib/inventory/document-rules.test.ts src/lib/inventory/bundle-availability.test.ts
 npm run db:verify:inventory
 npm run lint
 npm run typecheck
@@ -503,7 +540,7 @@ git commit -m "feat: add transactional inventory ledger"
 
 - [ ] **Step 1: Add query presentation tests**
 
-Cover stable stock/document page ordering, page-size limit, movement cursor encoding/decoding, permission-derived actions, and business error messages.
+Cover stable stock/document page ordering, page-size limit, movement cursor encoding/decoding, bundle sellable quantities, permission-derived actions, server-action denial for every missing permission, and business error messages.
 
 - [ ] **Step 2: Implement server-side queries**
 
@@ -515,7 +552,7 @@ Use a grouped draft form with default warehouse/location, line add/remove, bundl
 
 - [ ] **Step 4: Implement list/detail traceability**
 
-Make balance rows link to filtered movements and movement rows link to source document. Posted/reversed documents are read-only. Only permitted users see post/reverse controls; server actions always recheck permissions.
+Make balance rows link to filtered movements and movement rows link to `/app/inventory/documents/[id]`. The detail query returns header, entered lines, bundle component snapshots, movements, original/reversal links, and audit events. Posted/reversed documents are read-only. Only permitted users see post/reverse controls; server actions always recheck permissions and tests call those actions without permission to prove denial.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -539,7 +576,7 @@ git commit -m "feat: add inventory operations UI"
 
 - [ ] **Step 1: Write failing dashboard presentation tests**
 
-Cover empty state, product/SKU/bundle counts, stocked SKU count, quantity groups by unit without cross-unit addition, warehouse count, draft count, recent movement/audit rows, and forbidden notice.
+Cover empty state, product/SKU/bundle counts, stocked SKU count, quantity groups by unit without cross-unit addition, warehouse count, one `draft` count labeled “待过账单据”, recent movement/audit rows, and forbidden notice. Do not create a second “草稿单据” metric because `draft` is the only pending state.
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -585,7 +622,7 @@ Expected: lint, typecheck, all Vitest files, and production build pass.
 
 - [ ] **Step 3: Start the app and exercise the real phase-one path**
 
-Create a local admin without passing its password on the command line. Verify in browser: login → dashboard → product create/image upload → catalog import → warehouse create → inbound post → bundle outbound → insufficient stock rejection → transfer → stocktake → reversal → audit log.
+Create a local admin without passing its password on the command line. Create a non-admin role with `catalog:read`, `warehouses:read`, `inventory:read`, and `inventory:create` but no `inventory:post`, then verify both hidden UI and direct server rejection. Verify in browser: login → dashboard → category/unit maintenance → product create/real image upload → catalog import/history → warehouse create → inbound post → bundle availability/outbound → insufficient stock rejection → transfer → stocktake → document detail → reversal links → audit log.
 
 - [ ] **Step 4: Verify list and responsive behavior**
 
@@ -600,11 +637,11 @@ Use representative catalog, stock, document, movement, and audit queries with `E
 Document local setup, storage configuration, image limits, import template, document status model, and verification commands.
 
 ```bash
-git add .
+git status --short
+git add README.md docs/ui-guidelines.md
 git commit -m "docs: complete inventory phase one setup"
 ```
 
 - [ ] **Step 7: Confirm template isolation**
 
 Verify the new repository contains all business work and `/Users/xujunbao/WebstormProjects/claude/nextjs-admin-template` has no uncommitted business changes. Remove the inventory spec/plan from the template working tree in a separate cleanup commit only after confirming both documents exist in the new project.
-
