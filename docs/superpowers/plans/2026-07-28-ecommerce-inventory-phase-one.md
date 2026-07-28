@@ -224,7 +224,7 @@ Expected: FAIL because phase-one tables do not exist.
 
 - [ ] **Step 3: Define focused domain tables and enums**
 
-Use `numeric(18, 4)` for quantities. Include database checks for positive document-line quantities, nonzero adjustment quantities, valid image-path length, unique `(sku_id, warehouse_id, location_id)` balances, and unique `reversal_of_document_id` where non-null.
+Use `numeric(18, 4)` for quantities. Every editable document line stores a positive `quantity`. Adjustment lines additionally store an `adjustment_direction` enum (`increase` or `decrease`); the service derives the signed delta, so the database never needs to allow negative editable quantities. Include database checks for positive document-line quantities, required adjustment direction only on adjustment documents, valid image-path length, unique `(sku_id, warehouse_id, location_id)` balances, and unique `reversal_of_document_id` where non-null.
 
 Export each domain table through `src/lib/db/schema.ts` so Better Auth and current imports remain unchanged.
 
@@ -485,7 +485,7 @@ git commit -m "feat: add warehouse management"
 
 - [ ] **Step 1: Write failing document-rule tests**
 
-Cover every matrix row from spec section 7.1, signed effects, required source/target locations, no same-location transfer, no negative count, rejection of quantity precision beyond four decimals, bundle allowed only on outbound, bundle component aggregation, insufficient component details, inactive SKU/warehouse/location rejection, and a new-balance row plan.
+Cover every matrix row from spec section 7.1, signed effects, positive adjustment quantity plus explicit increase/decrease direction, required source/target locations, no same-location transfer, no negative count, rejection of quantity precision beyond four decimals, bundle allowed only on outbound, bundle component aggregation, insufficient component details, inactive SKU/warehouse/location rejection, inactive expanded bundle-component rejection, and a new-balance row plan.
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -509,11 +509,11 @@ export function planStockEffects(input: DocumentDraft, bundles: BundleSnapshot[]
 
 - [ ] **Step 4: Implement transactional posting**
 
-Inside one database transaction: lock document, reject non-draft state, then re-read every SKU, warehouse, and location referenced by the draft and reject any inactive object even if it was active when the draft was created. Expand bundle snapshot, insert every missing balance key with zero using `INSERT ... ON CONFLICT DO NOTHING`, then select them `FOR UPDATE` in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event. This insert-then-lock protocol is mandatory because `FOR UPDATE` cannot lock a missing row.
+Inside one database transaction: lock document, reject non-draft state, then re-read every SKU, warehouse, and location referenced by the draft and reject any inactive object even if it was active when the draft was created. Expand bundle snapshots and also reject any inactive base component produced by expansion. Insert every missing balance key with zero using `INSERT ... ON CONFLICT DO NOTHING`, then select them `FOR UPDATE` in deterministic order, reject resulting negative balances, insert immutable movements with balance-after, update balances, mark posted, and append audit event. This insert-then-lock protocol is mandatory because `FOR UPDATE` cannot lock a missing row.
 
 - [ ] **Step 5: Implement one-time reversal**
 
-Lock original document, reject non-posted/reversal documents, plan exact negated original movements, and run those effects through the same missing-row insert, stable `FOR UPDATE` lock, active-object validation, and negative-balance check as normal posting. This deliberately blocks reversing an inbound whose stock has already been consumed. Insert one posted reversal, compute every `balance_after` from locked balances, set original to reversed, and write audit in one transaction. Enforce unique `reversal_of_document_id` in PostgreSQL.
+Lock original document, reject non-posted/reversal documents, plan exact negated original movements, and run those effects through the same missing-row insert, stable `FOR UPDATE` lock, existence checks, and negative-balance check as normal posting. Reversal deliberately skips active-state rejection because it corrects historical movements and must remain possible after an SKU, warehouse, or location is disabled. It still blocks reversing an inbound whose stock has already been consumed. Insert one posted reversal, compute every `balance_after` from locked balances, set original to reversed, and write audit in one transaction. Enforce unique `reversal_of_document_id` in PostgreSQL.
 
 - [ ] **Step 6: Add database-backed verification cases**
 
