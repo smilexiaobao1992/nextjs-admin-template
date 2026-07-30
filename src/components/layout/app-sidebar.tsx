@@ -67,7 +67,7 @@ function NavLink({
       className={cn(
         "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-[background-color,color,box-shadow,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active
-          ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(113,42,22,0.24)]"
+          ? "admin-nav-active bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(113,42,22,0.24)]"
           : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         collapsed && "justify-center px-0",
         nested && !collapsed && "pl-8",
@@ -121,7 +121,7 @@ function NavGroup({
         className={cn(
           "flex min-h-10 items-center justify-center rounded-lg text-sm font-medium transition-[background-color,color,box-shadow,transform] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
           groupActive
-            ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(113,42,22,0.24)]"
+            ? "admin-nav-active bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(113,42,22,0.24)]"
             : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         )}
       >

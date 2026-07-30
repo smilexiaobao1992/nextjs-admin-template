@@ -1,6 +1,8 @@
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { AdminTheme } from "@/lib/admin-theme";
 import { SignOutButton } from "./sign-out-button";
+import ThemeSwitcher from "./theme-switcher";
 
 type HeaderUser = {
   name: string;
@@ -12,15 +14,19 @@ type HeaderUser = {
 export default function UserHeader({
   user,
   onOpenNavigation,
+  theme,
+  onThemeChange,
 }: {
   user: HeaderUser;
   onOpenNavigation: () => void;
+  theme: AdminTheme;
+  onThemeChange: (theme: AdminTheme) => void;
 }) {
   const initials = (user.name || user.email).slice(0, 2).toUpperCase();
   const roleLabel = user.roleLabel || user.role;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-card/95 px-4 shadow-[0_1px_0_rgba(62,47,35,0.04),0_8px_24px_rgba(62,47,35,0.04)] sm:px-6">
+    <header className="admin-header sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-card/95 px-4 shadow-[0_1px_0_rgba(62,47,35,0.04),0_8px_24px_rgba(62,47,35,0.04)] sm:px-6">
       <Button
         type="button"
         variant="ghost"
@@ -33,6 +39,7 @@ export default function UserHeader({
       </Button>
 
       <div className="ml-auto flex items-center gap-3">
+        <ThemeSwitcher value={theme} onChange={onThemeChange} />
         <div className="hidden text-right sm:block">
           <p className="max-w-56 truncate text-sm font-medium">{user.name || user.email}</p>
           <p className="max-w-56 truncate text-xs text-muted-foreground">{roleLabel}</p>

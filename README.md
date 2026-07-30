@@ -4,15 +4,21 @@
 
 默认界面为**简体中文**（`lang="zh-CN"`）。需要多语言时，在业务层自行接入 i18n。
 
-## 界面预览
+## 双主题界面
 
-### 工作台
+登录后可从右上角切换主题，选择会保存在当前浏览器；两套主题共用相同页面、菜单和权限逻辑。
 
-![管理中心工作台](docs/images/admin-dashboard.jpg)
+### Graphite Workspace（默认）
 
-### 登录页
+石墨侧栏、暖白工作区和珊瑚主操作，适合库存、运营和内部管理工具。
 
-![管理中心登录页](docs/images/admin-login.png)
+![Graphite Workspace 主题设计稿](docs/images/theme-graphite-workspace.png)
+
+### Indigo Cloud
+
+亮色浮层侧栏、冷白画布和靛蓝主操作，适合通用 SaaS 与协作后台。
+
+![Indigo Cloud 主题设计稿](docs/images/theme-indigo-cloud.png)
 
 ## 技术栈
 

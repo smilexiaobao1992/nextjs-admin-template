@@ -16,6 +16,29 @@ const baseMenus = [
 ];
 
 describe("app shell", () => {
+  it("switches the admin theme and persists the selection", () => {
+    render(
+      <AppShell
+        user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
+        menus={baseMenus}
+        initialTheme="graphite"
+      >
+        <p>页面内容</p>
+      </AppShell>,
+    );
+
+    const shell = screen.getByTestId("app-shell");
+    expect(shell).toHaveAttribute("data-admin-theme", "graphite");
+    expect(document.documentElement).toHaveAttribute("data-admin-theme", "graphite");
+
+    fireEvent.click(screen.getByRole("button", { name: "切换界面主题" }));
+    fireEvent.click(screen.getByRole("button", { name: "使用 Indigo Cloud" }));
+
+    expect(shell).toHaveAttribute("data-admin-theme", "indigo");
+    expect(document.documentElement).toHaveAttribute("data-admin-theme", "indigo");
+    expect(document.cookie).toContain("admin-theme-style=indigo");
+  });
+
   it("labels the primary navigation and mobile menu", () => {
     render(
       <AppShell

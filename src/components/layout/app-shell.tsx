@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppSidebar from "./app-sidebar";
 import UserHeader from "./user-header";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { NavMenuItem } from "@/lib/rbac/permissions";
+import { ADMIN_THEME_COOKIE, type AdminTheme } from "@/lib/admin-theme";
 
 type ShellUser = {
   name: string;
@@ -22,17 +23,41 @@ type ShellUser = {
 export default function AppShell({
   user,
   menus,
+  initialTheme = "graphite",
   children,
 }: {
   user: ShellUser;
   menus: NavMenuItem[];
+  initialTheme?: AdminTheme;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<AdminTheme>(initialTheme);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.adminTheme = theme;
+
+    return () => {
+      if (root.dataset.adminTheme === theme) {
+        delete root.dataset.adminTheme;
+      }
+    };
+  }, [theme]);
+
+  const changeTheme = (nextTheme: AdminTheme) => {
+    setTheme(nextTheme);
+    document.cookie = `${ADMIN_THEME_COOKIE}=${nextTheme}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      data-testid="app-shell"
+      data-admin-theme={theme}
+      data-sidebar-collapsed={collapsed}
+      className="admin-shell-root min-h-screen bg-background text-foreground"
+    >
       <a
         href="#main-content"
         className="sr-only z-[100] rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
@@ -40,12 +65,17 @@ export default function AppShell({
         跳到主要内容
       </a>
 
-      <div className={cn("hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
+      <div className={cn("admin-sidebar-frame hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
         <AppSidebar items={menus} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
 
-      <div className={cn("min-h-screen bg-background", collapsed ? "md:pl-20" : "md:pl-64")}>
-        <UserHeader user={user} onOpenNavigation={() => setMobileOpen(true)} />
+      <div className={cn("admin-workspace min-h-screen bg-background", collapsed ? "md:pl-20" : "md:pl-64")}>
+        <UserHeader
+          user={user}
+          onOpenNavigation={() => setMobileOpen(true)}
+          theme={theme}
+          onThemeChange={changeTheme}
+        />
         <main
           id="main-content"
           tabIndex={-1}
