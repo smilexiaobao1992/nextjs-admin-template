@@ -23,7 +23,7 @@ type ShellUser = {
 export default function AppShell({
   user,
   menus,
-  initialTheme = "graphite",
+  initialTheme = "indigo",
   children,
 }: {
   user: ShellUser;

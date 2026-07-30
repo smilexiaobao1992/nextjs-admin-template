@@ -2,20 +2,20 @@
 
 ## Objective
 
-Extend the reusable admin template from one visual direction to two user-selectable directions without duplicating routes, business pages, RBAC logic, or component implementations. Keep **Graphite Workspace** as the default and add **Indigo Cloud** as the alternate theme.
+Extend the reusable admin template from one visual direction to two user-selectable directions without duplicating routes, business pages, RBAC logic, or component implementations. Use **Indigo Cloud** as the default and keep **Graphite Workspace** as the alternate theme.
 
 The two themes must remain suitable for real administration products, work across desktop and mobile navigation, preserve the existing system dark-mode behavior, and remember the selected theme in the current browser.
 
 ## Approved visual directions
 
-### Graphite Workspace (default)
+### Graphite Workspace (alternate)
 
 - Deep graphite navigation against a warm off-white workspace.
 - Controlled coral for the active navigation state and primary actions.
 - Connected sidebar and workspace geometry.
 - Confident, operational character suited to inventory, commerce, and internal tools.
 
-### Indigo Cloud (alternate)
+### Indigo Cloud (default)
 
 - Light, floating navigation panel against a cool blue-gray workspace.
 - Indigo for active navigation, focus, and primary actions.
@@ -56,7 +56,7 @@ Create a small theme contract with exactly two supported values:
 - `graphite`
 - `indigo`
 
-Unknown, empty, or outdated values resolve to `graphite`. The parser is shared by the server layout and client switcher so an invalid cookie cannot create an unsupported state.
+Unknown, empty, or outdated values resolve to `indigo`. The parser is shared by the server layout and client switcher so an invalid cookie cannot create an unsupported state.
 
 ### Persistence and initial render
 
@@ -148,7 +148,7 @@ No theme-specific menu records, permissions, or routes are introduced.
 
 ## Acceptance criteria
 
-- Graphite remains the default when no valid preference exists.
+- Indigo remains the default when no valid preference exists.
 - A signed-in user can switch between Graphite and Indigo from the header.
 - The selected theme persists across reloads in the same browser.
 - Sidebar, header, canvas, cards, controls, dialogs, and tables visibly follow the selected theme.

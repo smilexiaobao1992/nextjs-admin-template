@@ -8,13 +8,13 @@
 
 登录后可从右上角切换主题，选择会保存在当前浏览器；两套主题共用相同页面、菜单和权限逻辑。
 
-### Graphite Workspace（默认）
+### Graphite Workspace
 
 石墨侧栏、暖白工作区和珊瑚主操作，适合库存、运营和内部管理工具。
 
 ![Graphite Workspace 主题设计稿](docs/images/theme-graphite-workspace.png)
 
-### Indigo Cloud
+### Indigo Cloud（默认）
 
 亮色浮层侧栏、冷白画布和靛蓝主操作，适合通用 SaaS 与协作后台。
 

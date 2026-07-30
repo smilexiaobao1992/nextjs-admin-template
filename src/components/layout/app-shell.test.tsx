@@ -16,6 +16,19 @@ const baseMenus = [
 ];
 
 describe("app shell", () => {
+  it("uses indigo as the default theme", () => {
+    render(
+      <AppShell
+        user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
+        menus={baseMenus}
+      >
+        <p>页面内容</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByTestId("app-shell")).toHaveAttribute("data-admin-theme", "indigo");
+  });
+
   it("switches the admin theme and persists the selection", () => {
     render(
       <AppShell
