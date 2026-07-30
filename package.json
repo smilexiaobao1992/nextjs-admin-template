@@ -22,7 +22,7 @@
     "admin:create": "tsx scripts/create-admin.ts"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": "24.x"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

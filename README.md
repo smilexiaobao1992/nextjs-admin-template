@@ -37,7 +37,7 @@
 
 ## 环境要求
 
-- Node.js 20.19 或更高版本，推荐 Node.js 22
+- Node.js 24
 - npm 10
 - PostgreSQL 15 或更高版本，或 Supabase 项目
 
@@ -156,7 +156,7 @@ src/
 
 ## 质量门槛
 
-GitHub Actions 使用 Node.js 22 与 PostgreSQL 17，依次执行：
+GitHub Actions 使用 Node.js 24 与 PostgreSQL 17，依次执行：
 
 ```bash
 npm ci
