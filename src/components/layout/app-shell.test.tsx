@@ -17,7 +17,7 @@ const baseMenus = [
 
 describe("app shell", () => {
   it("uses indigo as the default theme", () => {
-    render(
+    const { container } = render(
       <AppShell
         user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
         menus={baseMenus}
@@ -27,6 +27,7 @@ describe("app shell", () => {
     );
 
     expect(screen.getByTestId("app-shell")).toHaveAttribute("data-admin-theme", "indigo");
+    expect(container.querySelector(".admin-sidebar-frame")).toHaveClass("overflow-visible");
   });
 
   it("switches the admin theme and persists the selection", () => {

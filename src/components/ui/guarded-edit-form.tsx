@@ -1,18 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
-const DISCARD_MESSAGE = "当前修改尚未保存，确认放弃并切换吗？";
+const DISCARD_MESSAGE = "当前修改尚未保存，放弃后本次填写的内容将不会保留。";
+
+type PendingNavigation =
+  | { type: "link"; href: string }
+  | { type: "back" }
+  | null;
 
 export function GuardedEditForm({ onChange, onSubmit, ...props }: ComponentProps<"form">) {
+  const router = useRouter();
   const [dirty, setDirty] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
   const allowPopNavigation = useRef(false);
 
   useEffect(() => {
     if (!dirty) {
       return;
     }
+
+    const currentHref = window.location.href;
 
     function warnBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
@@ -34,13 +46,13 @@ export function GuardedEditForm({ onChange, onSubmit, ...props }: ComponentProps
         return;
       }
 
-      if (!window.confirm(DISCARD_MESSAGE)) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      setDirty(false);
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigation({
+        type: "link",
+        href: `${destination.pathname}${destination.search}${destination.hash}`,
+      });
+      setDialogOpen(true);
     }
 
     function guardHistoryBack() {
@@ -48,17 +60,12 @@ export function GuardedEditForm({ onChange, onSubmit, ...props }: ComponentProps
         return;
       }
 
-      if (!window.confirm(DISCARD_MESSAGE)) {
-        window.history.pushState({ ...window.history.state, rbacDirtyGuard: true }, "", window.location.href);
-        return;
-      }
-
-      allowPopNavigation.current = true;
-      setDirty(false);
-      window.setTimeout(() => window.history.back(), 0);
+      window.history.pushState({ ...window.history.state, rbacDirtyGuard: true }, "", currentHref);
+      setPendingNavigation({ type: "back" });
+      setDialogOpen(true);
     }
 
-    window.history.pushState({ ...window.history.state, rbacDirtyGuard: true }, "", window.location.href);
+    window.history.pushState({ ...window.history.state, rbacDirtyGuard: true }, "", currentHref);
     window.addEventListener("beforeunload", warnBeforeUnload);
     document.addEventListener("click", guardInternalLink, true);
     window.addEventListener("popstate", guardHistoryBack);
@@ -69,22 +76,57 @@ export function GuardedEditForm({ onChange, onSubmit, ...props }: ComponentProps
     };
   }, [dirty]);
 
+  function confirmNavigation() {
+    const navigation = pendingNavigation;
+    setDialogOpen(false);
+    setPendingNavigation(null);
+    setDirty(false);
+
+    if (navigation?.type === "link") {
+      router.push(navigation.href);
+      return;
+    }
+
+    if (navigation?.type === "back") {
+      allowPopNavigation.current = true;
+      window.setTimeout(() => window.history.back(), 0);
+    }
+  }
+
+  function handleDialogChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setPendingNavigation(null);
+    }
+  }
+
   return (
-    <form
-      {...props}
-      data-rbac-edit-form
-      data-dirty={dirty ? "true" : "false"}
-      onChange={(event) => {
-        onChange?.(event);
-        setDirty(true);
-      }}
-      onSubmit={(event) => {
-        onSubmit?.(event);
-        if (!event.defaultPrevented) {
-          setDirty(false);
-        }
-      }}
-    />
+    <>
+      <form
+        {...props}
+        data-rbac-edit-form
+        data-dirty={dirty ? "true" : "false"}
+        onChange={(event) => {
+          onChange?.(event);
+          setDirty(true);
+        }}
+        onSubmit={(event) => {
+          onSubmit?.(event);
+          if (!event.defaultPrevented) {
+            setDirty(false);
+          }
+        }}
+      />
+      <ConfirmationDialog
+        open={dialogOpen}
+        onOpenChange={handleDialogChange}
+        title="放弃未保存的修改？"
+        description={DISCARD_MESSAGE}
+        confirmLabel="放弃修改"
+        cancelLabel="继续编辑"
+        onConfirm={confirmNavigation}
+      />
+    </>
   );
 }
 

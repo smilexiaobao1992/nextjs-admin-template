@@ -65,7 +65,7 @@ export default function AppShell({
         跳到主要内容
       </a>
 
-      <div className={cn("admin-sidebar-frame hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
+      <div className={cn("admin-sidebar-frame hidden overflow-visible md:fixed md:inset-y-0 md:left-0 md:z-40 md:block", collapsed ? "md:w-20" : "md:w-64")}>
         <AppSidebar items={menus} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
 

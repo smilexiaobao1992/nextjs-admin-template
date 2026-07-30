@@ -3,9 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfirmSubmitButton } from "./confirm-submit-button";
 
 describe("ConfirmSubmitButton", () => {
-  it("does not submit when the user cancels confirmation", () => {
+  it("uses the themed dialog and does not submit when cancelled", () => {
     const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(
       <form onSubmit={submit}>
@@ -14,12 +13,13 @@ describe("ConfirmSubmitButton", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    expect(screen.getByRole("dialog", { name: "确认操作" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("submits after confirmation", () => {
+  it("submits after confirming in the dialog", () => {
     const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
       <form onSubmit={submit}>
@@ -28,6 +28,7 @@ describe("ConfirmSubmitButton", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
     expect(submit).toHaveBeenCalledTimes(1);
   });
 });

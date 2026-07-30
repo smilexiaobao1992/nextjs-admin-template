@@ -208,7 +208,7 @@ export default function AppSidebar({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full flex-col rounded-[inherit] bg-sidebar text-sidebar-foreground">
       <div className={cn("relative flex h-16 items-center", collapsed ? "justify-center px-2" : "px-4")}>
         <Link
           href="/app"

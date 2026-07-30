@@ -29,7 +29,7 @@ const choices: Array<{
   {
     value: "indigo",
     name: "Indigo Cloud",
-    description: "亮色浮层侧栏、冷白画布与靛蓝主操作。",
+    description: "亮色侧栏、冷白画布与靛蓝主操作。",
     swatches: ["bg-white", "bg-[#f2f6fc]", "bg-[#dde5f1]", "bg-[#4967d8]"],
   },
 ];

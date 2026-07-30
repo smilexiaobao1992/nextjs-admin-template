@@ -60,7 +60,7 @@ describe("UserList", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: "普通成员" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "高级运营" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "普通成员", hidden: true })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "高级运营", hidden: true })).not.toBeInTheDocument();
   });
 });

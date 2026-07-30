@@ -1,8 +1,10 @@
 "use client";
 
-import type { MouseEvent } from "react";
-import { SubmitButton } from "./submit-button";
-import type { ButtonProps } from "./button";
+import { LoaderCircle } from "lucide-react";
+import { useRef, useState, type MouseEvent } from "react";
+import { useFormStatus } from "react-dom";
+import { Button, type ButtonProps } from "./button";
+import { ConfirmationDialog } from "./confirmation-dialog";
 
 type ConfirmSubmitButtonProps = ButtonProps & {
   confirmMessage: string;
@@ -11,15 +13,48 @@ type ConfirmSubmitButtonProps = ButtonProps & {
 
 export function ConfirmSubmitButton({
   confirmMessage,
+  pendingLabel = "提交中…",
+  children,
+  disabled,
   onClick,
   ...props
 }: ConfirmSubmitButtonProps) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { pending } = useFormStatus();
+
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     onClick?.(event);
-    if (!event.defaultPrevented && !window.confirm(confirmMessage)) {
-      event.preventDefault();
+    if (!event.defaultPrevented) {
+      setOpen(true);
     }
   }
 
-  return <SubmitButton {...props} onClick={handleClick} />;
+  function confirmSubmit() {
+    setOpen(false);
+    triggerRef.current?.form?.requestSubmit();
+  }
+
+  return (
+    <>
+      <Button
+        {...props}
+        ref={triggerRef}
+        type="button"
+        disabled={disabled || pending}
+        onClick={handleClick}
+      >
+        {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
+        {pending ? pendingLabel : children}
+      </Button>
+      <ConfirmationDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="确认操作"
+        description={confirmMessage}
+        confirmLabel="确认删除"
+        onConfirm={confirmSubmit}
+      />
+    </>
+  );
 }
