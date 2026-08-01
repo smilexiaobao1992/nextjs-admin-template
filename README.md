@@ -8,13 +8,13 @@
 
 登录后可从右上角切换主题，选择会保存在当前浏览器；两套主题共用相同页面、菜单和权限逻辑。
 
-### Graphite Workspace
+### Graphite Workspace（默认）
 
 石墨侧栏、暖白工作区和珊瑚主操作，适合库存、运营和内部管理工具。
 
 ![Graphite Workspace 主题设计稿](docs/images/theme-graphite-workspace.png)
 
-### Indigo Cloud（默认）
+### Indigo Cloud
 
 亮色浮层侧栏、冷白画布和靛蓝主操作，适合通用 SaaS 与协作后台。
 
@@ -26,6 +26,7 @@
 - Better Auth 1.6，邮箱密码登录与 Admin 插件
 - Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
 - Vitest、Testing Library、ESLint、GitHub Actions
+- Docker Compose 本地 PostgreSQL 17
 
 ## 已实现的安全边界
 
@@ -37,15 +38,16 @@
 - 会话 cookie cache 关闭，角色降权和会话撤销直接读取数据库状态。
 - 认证端点使用数据库限速，适用于 Vercel 多实例。
 - 创建账号统一要求至少 12 位密码，并同时包含字母和数字。
-- `BETTER_AUTH_SECRET` 至少 32 字节；数据库事务保证至少保留一个 `admin`。
+- `BETTER_AUTH_SECRET` 至少 32 字节；数据库事务保证至少保留一个未封禁的 `admin`。
+- 关键写操作写入追加型审计日志；用户封禁会撤销其全部会话。
 
-更多说明见 [SECURITY.md](SECURITY.md)。
+更多说明见 [SECURITY.md](SECURITY.md)。认证扩展（OAuth / 2FA / 邮件重置）见 [docs/auth-extensions.md](docs/auth-extensions.md)。
 
 ## 环境要求
 
 - Node.js 24
 - npm 10
-- PostgreSQL 15 或更高版本，或 Supabase 项目
+- PostgreSQL 15 或更高版本（推荐 Docker Compose 中的 17），或 Supabase 项目
 
 ## 本地启动
 
@@ -54,9 +56,10 @@ git clone git@github.com:smilexiaobao1992/nextjs-admin-template.git
 cd nextjs-admin-template
 npm ci
 cp .env.example .env.local
+docker compose up -d   # 或 npm run db:up
 ```
 
-编辑 `.env.local`：
+编辑 `.env.local`（若使用仓库自带 Compose，默认值可直接使用）：
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
@@ -76,6 +79,8 @@ npm run dev
 ```
 
 浏览器打开 [http://localhost:3000](http://localhost:3000)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。
+
+部署健康检查：`GET /api/health`（检查数据库连通性，不暴露密钥）。
 
 ## Supabase 与 Vercel
 
@@ -108,23 +113,28 @@ alter default privileges for role postgres in schema public
 | `npm run dev` | 启动开发服务器 |
 | `npm run check` | lint、类型检查和测试 |
 | `npm run build` | 生产构建 |
+| `npm run db:up` / `db:down` | 启动 / 停止本地 Postgres（Docker Compose） |
 | `npm run db:generate` | 根据 schema 生成迁移 |
 | `npm run db:migrate` | 执行已提交迁移 |
 | `npm run db:verify` | 验证种子数据和关键数据库约束 |
 | `npm run db:studio` | 打开 Drizzle Studio |
 | `npm run admin:create` | 交互式创建管理员 |
+| `npm run scaffold:feature -- <name>` | 生成 feature 与页面骨架 |
 
 ## 路由
 
 | 路由 | 权限 |
 | --- | --- |
 | `/login` | 公开（已登录会跳转到安全的 `next` 或 `/app`） |
-| `/app` | 已登录用户（菜单按角色权限过滤） |
-| `/app/users` | `users:read` / 写操作用 `users:write` |
+| `/app` | 已登录用户（真实聚合统计；菜单仍按权限过滤） |
+| `/app/users` | `users:read` / 写操作用 `users:write`（含封禁、重置密码、撤销会话） |
 | `/app/roles` | `roles:read` / `roles:write` |
 | `/app/permissions` | `permissions:read` / `permissions:write` |
 | `/app/menus` | `menus:read` / `menus:write` |
+| `/app/audit` | `audit:read` |
+| `/app/profile` | 已登录（改密、管理本人会话） |
 | `/api/auth/[...all]` | Better Auth handler |
+| `/api/health` | 公开健康检查 |
 
 ## 目录结构与业务扩展
 
@@ -136,18 +146,23 @@ src/
     login/
     app/                       # 受保护壳下的页面
       page.tsx
-      users/page.tsx           # 组装 features/users，不写业务细节
+      users/page.tsx
+      audit/page.tsx
+      profile/page.tsx
     api/auth/[...all]/
+    api/health/
   features/                    # 业务域（复制后主要加这里）
     users/
     rbac/                      # 角色 / 权限 / 菜单 Server Actions
   components/
-    ui/
+    ui/                        # 含列表搜索、分页、状态提示
     layout/                    # AppShell 接收服务端过滤后的 menus
   lib/
-    auth/                      # 会话、requirePermission
+    auth/                      # 会话、requirePermission、用户生命周期
+    audit/                     # 审计写入与查询
+    list/                      # 列表分页/搜索参数约定
     rbac/                      # 权限解析、校验、CRUD
-    db/                        # schema 含 role / permission / menu
+    db/                        # schema 含 role / permission / menu / audit_log
     utils.ts
   proxy.ts                     # 仅转发 pathname（Next.js 16 Proxy）
 ```
@@ -155,10 +170,47 @@ src/
 扩展建议：
 
 1. **新业务权限**：在「权限管理」新增 `orders:read` 等 key；在「角色管理」勾选；在页面/Action 调用 `requirePermission("orders:read")`。
-2. **新业务页**：`src/features/<domain>/` + `src/app/app/<route>/page.tsx`；在「菜单管理」加侧栏入口并绑定权限。
+2. **新业务页**：`npm run scaffold:feature -- orders`，或手动建 `src/features/<domain>/` + `src/app/app/<route>/page.tsx`；在「菜单管理」加侧栏入口并绑定权限。
 3. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
 4. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查是安全层。
-5. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
+5. 关键写操作调用 `writeAuditLog`。
+6. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
+
+## 路线图
+
+只做后台**基础设施**，不收录具体业务模块。完成项会打勾。
+
+### v1.1 可用性
+
+- [x] Docker Compose 本地 PostgreSQL
+- [x] 用户封禁 / 解封、管理员重置密码
+- [x] 列表搜索与分页约定（用户列表、审计列表接入）
+- [x] 真实工作台统计（用户 / 角色 / 会话 / 近 7 日审计）
+
+### v1.2 可观测
+
+- [x] 操作审计日志（追加写入 + `audit:read` 只读页）
+- [x] 会话管理（个人中心撤销本人会话；管理员撤销他人全部会话）
+- [x] 部署健康检查 `GET /api/health`
+
+### v1.3 可扩展
+
+- [x] feature 脚手架 `npm run scaffold:feature`
+- [x] OAuth / 2FA / 邮件重置说明文档
+- [x] 状态提示组件统一（`StatusNotice`）
+
+### 开源侧
+
+- [x] CONTRIBUTING
+- [x] Issue / PR 模板
+- [x] README 路线图与命令说明
+
+### 后续可选（未排期）
+
+- [ ] 文案 key 化，便于 fork 接入 i18n
+- [ ] 面包屑 / 页面标题壳层约定
+- [ ] 更丰富的 DataTable（排序、列显隐）骨架
+- [ ] 发布版本标签与 CHANGELOG 流程
 
 ## 质量门槛
 
@@ -172,7 +224,7 @@ npm run check
 npm run build
 ```
 
-本地推荐同样跑 `npm run check` 与 `npm run build`。
+本地推荐同样跑 `npm run check` 与 `npm run build`。贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 许可证
 

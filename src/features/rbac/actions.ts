@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { actorFromSession, getRequestIpAddress, writeAuditLog } from "@/lib/audit/log";
 import { requirePermission } from "@/lib/auth/session";
 import {
   createMenu,
@@ -29,18 +30,28 @@ function revalidateRbac() {
   revalidatePath("/app/permissions");
   revalidatePath("/app/menus");
   revalidatePath("/app/users");
+  revalidatePath("/app/audit");
 }
 
 // --- Permissions ---
 
 export async function createPermissionAction(formData: FormData) {
-  await requirePermission("permissions:write");
+  const session = await requirePermission("permissions:write");
   let id = "";
+  const key = String(formData.get("key") ?? "");
   try {
     id = await createPermission({
-      key: String(formData.get("key") ?? ""),
+      key,
       name: String(formData.get("name") ?? ""),
       description: String(formData.get("description") ?? ""),
+    });
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "permission.create",
+      resourceType: "permission",
+      resourceId: id,
+      summary: `创建权限 ${key.trim().toLowerCase()}`,
+      ipAddress: await getRequestIpAddress(),
     });
   } catch (error) {
     redirect(`/app/permissions?mode=create&notice=${noticeFor(error)}`);
@@ -50,13 +61,21 @@ export async function createPermissionAction(formData: FormData) {
 }
 
 export async function updatePermissionAction(formData: FormData) {
-  await requirePermission("permissions:write");
+  const session = await requirePermission("permissions:write");
   const id = String(formData.get("id") ?? "");
   try {
     await updatePermission({
       id,
       name: String(formData.get("name") ?? ""),
       description: String(formData.get("description") ?? ""),
+    });
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "permission.update",
+      resourceType: "permission",
+      resourceId: id,
+      summary: "更新权限",
+      ipAddress: await getRequestIpAddress(),
     });
   } catch (error) {
     redirect(`/app/permissions?notice=${noticeFor(error)}`);
@@ -66,9 +85,18 @@ export async function updatePermissionAction(formData: FormData) {
 }
 
 export async function deletePermissionAction(formData: FormData) {
-  await requirePermission("permissions:write");
+  const session = await requirePermission("permissions:write");
+  const id = String(formData.get("id") ?? "");
   try {
-    await deletePermission(String(formData.get("id") ?? ""));
+    await deletePermission(id);
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "permission.delete",
+      resourceType: "permission",
+      resourceId: id,
+      summary: "删除权限",
+      ipAddress: await getRequestIpAddress(),
+    });
   } catch (error) {
     redirect(`/app/permissions?notice=${noticeFor(error)}`);
   }
@@ -79,15 +107,24 @@ export async function deletePermissionAction(formData: FormData) {
 // --- Roles ---
 
 export async function createRoleAction(formData: FormData) {
-  await requirePermission("roles:write");
+  const session = await requirePermission("roles:write");
   let id = "";
+  const key = String(formData.get("key") ?? "");
   try {
     id = await createRole({
-      key: String(formData.get("key") ?? ""),
+      key,
       name: String(formData.get("name") ?? ""),
       description: String(formData.get("description") ?? ""),
       permissionIds: formData.getAll("permissionIds").map(String),
       isDefault: formData.get("isDefault") === "on",
+    });
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "role.create",
+      resourceType: "role",
+      resourceId: id,
+      summary: `创建角色 ${key.trim().toLowerCase()}`,
+      ipAddress: await getRequestIpAddress(),
     });
   } catch (error) {
     redirect(`/app/roles?mode=create&notice=${noticeFor(error)}`);
@@ -110,6 +147,14 @@ export async function updateRoleAction(formData: FormData) {
       },
       session.user.role ?? "",
     );
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "role.update",
+      resourceType: "role",
+      resourceId: id,
+      summary: "更新角色",
+      ipAddress: await getRequestIpAddress(),
+    });
   } catch (error) {
     redirect(`/app/roles?notice=${noticeFor(error)}`);
   }
@@ -118,9 +163,18 @@ export async function updateRoleAction(formData: FormData) {
 }
 
 export async function deleteRoleAction(formData: FormData) {
-  await requirePermission("roles:write");
+  const session = await requirePermission("roles:write");
+  const id = String(formData.get("id") ?? "");
   try {
-    await deleteRole(String(formData.get("id") ?? ""));
+    await deleteRole(id);
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "role.delete",
+      resourceType: "role",
+      resourceId: id,
+      summary: "删除角色",
+      ipAddress: await getRequestIpAddress(),
+    });
   } catch (error) {
     redirect(`/app/roles?notice=${noticeFor(error)}`);
   }
@@ -131,17 +185,26 @@ export async function deleteRoleAction(formData: FormData) {
 // --- Menus ---
 
 export async function createMenuAction(formData: FormData) {
-  await requirePermission("menus:write");
+  const session = await requirePermission("menus:write");
   let id = "";
+  const title = String(formData.get("title") ?? "");
   try {
     id = await createMenu({
-      title: String(formData.get("title") ?? ""),
+      title,
       href: String(formData.get("href") ?? ""),
       icon: String(formData.get("icon") ?? ""),
       sortOrder: Number(formData.get("sortOrder") ?? 0),
       parentId: String(formData.get("parentId") ?? "") || null,
       permissionId: String(formData.get("permissionId") ?? "") || null,
       isVisible: formData.get("isVisible") === "on",
+    });
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "menu.create",
+      resourceType: "menu",
+      resourceId: id,
+      summary: `创建菜单 ${title.trim()}`,
+      ipAddress: await getRequestIpAddress(),
     });
   } catch (error) {
     redirect(`/app/menus?mode=create&notice=${noticeFor(error)}`);
@@ -151,7 +214,7 @@ export async function createMenuAction(formData: FormData) {
 }
 
 export async function updateMenuAction(formData: FormData) {
-  await requirePermission("menus:write");
+  const session = await requirePermission("menus:write");
   const id = String(formData.get("id") ?? "");
   try {
     await updateMenu({
@@ -164,6 +227,14 @@ export async function updateMenuAction(formData: FormData) {
       permissionId: String(formData.get("permissionId") ?? "") || null,
       isVisible: formData.get("isVisible") === "on",
     });
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "menu.update",
+      resourceType: "menu",
+      resourceId: id,
+      summary: "更新菜单",
+      ipAddress: await getRequestIpAddress(),
+    });
   } catch (error) {
     redirect(`/app/menus?notice=${noticeFor(error)}`);
   }
@@ -172,9 +243,18 @@ export async function updateMenuAction(formData: FormData) {
 }
 
 export async function deleteMenuAction(formData: FormData) {
-  await requirePermission("menus:write");
+  const session = await requirePermission("menus:write");
+  const id = String(formData.get("id") ?? "");
   try {
-    await deleteMenu(String(formData.get("id") ?? ""));
+    await deleteMenu(id);
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "menu.delete",
+      resourceType: "menu",
+      resourceId: id,
+      summary: "删除菜单",
+      ipAddress: await getRequestIpAddress(),
+    });
   } catch (error) {
     redirect(`/app/menus?notice=${noticeFor(error)}`);
   }

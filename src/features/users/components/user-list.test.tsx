@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { UserList } from "./user-list";
 
-vi.mock("@/features/users/actions", () => ({ setUserRoleAction: vi.fn() }));
+vi.mock("@/features/users/actions", () => ({
+  setUserRoleAction: vi.fn(),
+  setUserBannedAction: vi.fn(),
+  resetUserPasswordAction: vi.fn(),
+  revokeUserSessionsAction: vi.fn(),
+}));
 
 const user = {
   id: "user-1",
@@ -43,11 +48,11 @@ const roles = [
 
 describe("UserList", () => {
   it("renders role information without mutation controls for read-only users", () => {
-    render(<UserList users={[user]} roles={roles} canWrite={false} />);
+    render(<UserList users={[user]} roles={roles} canWrite={false} total={1} />);
 
     expect(screen.getByText("普通成员")).toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存角色" })).not.toBeInTheDocument();
   });
 
   it("shows only roles the server marked assignable", () => {
@@ -57,10 +62,26 @@ describe("UserList", () => {
         roles={roles}
         assignableRoles={[roles[0]]}
         canWrite
+        total={1}
       />,
     );
 
     expect(screen.getByRole("option", { name: "普通成员", hidden: true })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "高级运营", hidden: true })).not.toBeInTheDocument();
+  });
+
+  it("hides mutation controls for the current user row", () => {
+    render(
+      <UserList
+        users={[user]}
+        roles={roles}
+        canWrite
+        currentUserId={user.id}
+        total={1}
+      />,
+    );
+
+    expect(screen.getByText("当前登录账号")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "封禁" })).not.toBeInTheDocument();
   });
 });

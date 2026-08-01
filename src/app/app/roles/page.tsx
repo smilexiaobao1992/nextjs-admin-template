@@ -192,6 +192,7 @@ function RoleDetail({
               size="sm"
               variant="destructive"
               pendingLabel="删除中…"
+              confirmLabel="确认删除"
               confirmMessage={`确认删除角色“${role.name}”？请先确认没有用户使用该角色。`}
             >
               删除

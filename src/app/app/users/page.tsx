@@ -1,9 +1,13 @@
+import { ListPagination } from "@/components/ui/list-pagination";
+import { ListSearchForm } from "@/components/ui/list-search-form";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { CreateUserForm } from "@/features/users/components/create-user-form";
 import { UserList } from "@/features/users/components/user-list";
 import { userNoticeMessages } from "@/features/users/messages";
-import { listUsers } from "@/features/users/queries";
+import { listUsersPage } from "@/features/users/queries";
 import { requirePermission } from "@/lib/auth/session";
 import { canManageRolePermissionSets } from "@/lib/auth/authorization";
+import { parseListQuery } from "@/lib/list/pagination";
 import {
   isSystemAdminRole,
   listAllRoles,
@@ -14,12 +18,13 @@ import {
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ notice?: string }>;
+  searchParams: Promise<{ notice?: string; page?: string; q?: string; pageSize?: string }>;
 }) {
   const session = await requirePermission("users:read");
-  const { notice } = await searchParams;
-  const [users, roles, permissionIdsByRole] = await Promise.all([
-    listUsers(),
+  const params = await searchParams;
+  const listQuery = parseListQuery(params);
+  const [usersPage, roles, permissionIdsByRole] = await Promise.all([
+    listUsersPage(listQuery),
     listAllRoles(),
     listPermissionIdsByRole(),
   ]);
@@ -42,23 +47,44 @@ export default async function UsersPage({
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">用户</p>
         <h1 className="text-3xl font-semibold tracking-[-0.022em]">用户管理</h1>
-        <p className="mt-2 text-sm text-muted-foreground">查看系统账号，创建用户并调整角色。</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          查看系统账号，创建用户、调整角色、封禁账号、重置密码并管理会话。
+        </p>
       </div>
 
-      {notice && userNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
-          {userNoticeMessages[notice]}
-        </p>
-      ) : null}
+      <StatusNotice notice={params.notice} messages={userNoticeMessages} />
 
       {canWrite ? <CreateUserForm roles={assignableRoles} /> : null}
-      <UserList
-        users={users}
-        roles={roles}
-        assignableRoles={assignableRoles}
-        canWrite={canWrite}
-        canManageSystemRoles={canManageSystemRoles}
-      />
+
+      <div className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+        <ListSearchForm
+          action="/app/users"
+          defaultQuery={usersPage.q}
+          placeholder="按姓名、邮箱或角色搜索"
+          label="搜索用户"
+        />
+      </div>
+
+      <div className="space-y-0 overflow-hidden rounded-xl">
+        <UserList
+          users={usersPage.items}
+          roles={roles}
+          assignableRoles={assignableRoles}
+          canWrite={canWrite}
+          canManageSystemRoles={canManageSystemRoles}
+          currentUserId={session.user.id}
+          total={usersPage.total}
+        />
+        <div className="rounded-b-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+          <ListPagination
+            pathname="/app/users"
+            page={usersPage.page}
+            pageSize={usersPage.pageSize}
+            total={usersPage.total}
+            q={usersPage.q}
+          />
+        </div>
+      </div>
     </div>
   );
 }

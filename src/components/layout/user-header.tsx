@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AdminTheme } from "@/lib/admin-theme";
@@ -40,16 +41,21 @@ export default function UserHeader({
 
       <div className="ml-auto flex items-center gap-3">
         <ThemeSwitcher value={theme} onChange={onThemeChange} />
-        <div className="hidden text-right sm:block">
+        <Link
+          href="/app/profile"
+          className="hidden rounded-lg px-2 py-1 text-right transition-[background-color] hover:bg-accent sm:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="个人中心"
+        >
           <p className="max-w-56 truncate text-sm font-medium">{user.name || user.email}</p>
           <p className="max-w-56 truncate text-xs text-muted-foreground">{roleLabel}</p>
-        </div>
-        <span
-          aria-hidden="true"
-          className="inline-flex size-9 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary"
+        </Link>
+        <Link
+          href="/app/profile"
+          aria-label="个人中心"
+          className="inline-flex size-9 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary transition-[transform,background-color] hover:bg-primary/18 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {initials}
-        </span>
+        </Link>
         <SignOutButton />
       </div>
     </header>

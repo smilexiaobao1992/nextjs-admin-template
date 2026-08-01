@@ -16,7 +16,7 @@ const baseMenus = [
 ];
 
 describe("app shell", () => {
-  it("uses indigo as the default theme", () => {
+  it("uses graphite as the default theme", () => {
     const { container } = render(
       <AppShell
         user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
@@ -26,7 +26,7 @@ describe("app shell", () => {
       </AppShell>,
     );
 
-    expect(screen.getByTestId("app-shell")).toHaveAttribute("data-admin-theme", "indigo");
+    expect(screen.getByTestId("app-shell")).toHaveAttribute("data-admin-theme", "graphite");
     expect(container.querySelector(".admin-sidebar-frame")).toHaveClass("overflow-visible");
   });
 

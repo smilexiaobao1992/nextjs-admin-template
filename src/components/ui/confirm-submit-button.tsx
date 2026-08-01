@@ -8,11 +8,15 @@ import { ConfirmationDialog } from "./confirmation-dialog";
 
 type ConfirmSubmitButtonProps = ButtonProps & {
   confirmMessage: string;
+  confirmTitle?: string;
+  confirmLabel?: string;
   pendingLabel?: string;
 };
 
 export function ConfirmSubmitButton({
   confirmMessage,
+  confirmTitle = "确认操作",
+  confirmLabel = "确认",
   pendingLabel = "提交中…",
   children,
   disabled,
@@ -50,9 +54,9 @@ export function ConfirmSubmitButton({
       <ConfirmationDialog
         open={open}
         onOpenChange={setOpen}
-        title="确认操作"
+        title={confirmTitle}
         description={confirmMessage}
-        confirmLabel="确认删除"
+        confirmLabel={confirmLabel}
         onConfirm={confirmSubmit}
       />
     </>

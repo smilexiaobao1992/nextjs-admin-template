@@ -2,6 +2,7 @@ import {
   KeyRound,
   LayoutDashboard,
   PanelLeft,
+  ScrollText,
   Settings,
   Shield,
   ShieldCheck,
@@ -17,8 +18,10 @@ const ICONS: Record<string, LucideIcon> = {
   KeyRound,
   PanelLeft,
   Settings,
+  ScrollText,
   Key: KeyRound,
   Menu: PanelLeft,
+  Audit: ScrollText,
 };
 
 export function resolveMenuIcon(name: string | null | undefined): LucideIcon {

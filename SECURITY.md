@@ -27,6 +27,9 @@ You should receive an acknowledgement within 7 days. Please allow reasonable tim
 - Session cookie cache is disabled so role demotion and session revocation take effect immediately
 - Auth rate limiting uses the database (safe for multi-instance Vercel deploys)
 - Credential passwords must be at least 12 characters and include letters and digits
+- Sensitive write actions append immutable audit log rows
+- Banning a user revokes all of their sessions; the last unbanned admin cannot be demoted or banned
+- `GET /api/health` only reports process and database availability (no secrets)
 
 ## Deployment checklist
 

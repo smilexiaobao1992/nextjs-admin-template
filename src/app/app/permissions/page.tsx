@@ -153,6 +153,7 @@ export default async function PermissionsPage({
                       size="sm"
                       variant="destructive"
                       pendingLabel="删除中…"
+                      confirmLabel="确认删除"
                       confirmMessage={`确认删除权限“${selected.name}（${selected.key}）”？请先解除所有角色和菜单引用。`}
                     >
                       删除

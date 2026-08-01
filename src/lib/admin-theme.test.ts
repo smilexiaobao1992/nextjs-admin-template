@@ -7,8 +7,8 @@ describe("admin theme", () => {
     expect(parseAdminTheme("indigo")).toBe("indigo");
   });
 
-  it("falls back to indigo for missing or unknown values", () => {
-    expect(parseAdminTheme(undefined)).toBe("indigo");
-    expect(parseAdminTheme("future-theme")).toBe("indigo");
+  it("falls back to graphite for missing or unknown values", () => {
+    expect(parseAdminTheme(undefined)).toBe("graphite");
+    expect(parseAdminTheme("future-theme")).toBe("graphite");
   });
 });

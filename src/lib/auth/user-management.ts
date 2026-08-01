@@ -1,7 +1,7 @@
-import { hashPassword } from "better-auth/crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, role, rolePermission, user } from "@/lib/db/schema";
+import { account, role, rolePermission, session, user } from "@/lib/db/schema";
 import { DEFAULT_MEMBER_ROLE_KEY, SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
 import {
   canChangeRole,
@@ -19,7 +19,10 @@ export class UserManagementError extends Error {
       | "not_found"
       | "invalid_role"
       | "system_role_forbidden"
-      | "role_scope_forbidden",
+      | "role_scope_forbidden"
+      | "self_forbidden"
+      | "wrong_password"
+      | "no_credential",
   ) {
     super(code);
   }
@@ -207,4 +210,214 @@ export async function setUserRole(userId: string, nextRole: string, actorRoleKey
 
     await tx.update(user).set({ role: roleRow.key, updatedAt: new Date() }).where(eq(user.id, userId));
   });
+}
+
+async function countActiveAdmins(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) {
+  const admins = await tx
+    .select({ id: user.id })
+    .from(user)
+    .where(and(eq(user.role, SYSTEM_ADMIN_ROLE_KEY), eq(user.banned, false)));
+  return admins.length;
+}
+
+export async function setUserBanned({
+  userId,
+  banned,
+  banReason,
+  actorUserId,
+  actorRoleKey,
+}: {
+  userId: string;
+  banned: boolean;
+  banReason?: string | null;
+  actorUserId: string;
+  actorRoleKey: string;
+}) {
+  if (userId === actorUserId) {
+    throw new UserManagementError("self_forbidden");
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select id from "user" where role = ${SYSTEM_ADMIN_ROLE_KEY} for update`);
+
+    const [target] = await tx
+      .select({ id: user.id, role: user.role, banned: user.banned })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    if (!target) {
+      throw new UserManagementError("not_found");
+    }
+
+    const [targetRole] = await tx
+      .select({ isSystem: role.isSystem })
+      .from(role)
+      .where(eq(role.key, target.role))
+      .limit(1);
+
+    if (
+      !canManageSystemRole({
+        actorRole: actorRoleKey,
+        currentRoleIsSystem: Boolean(targetRole?.isSystem) || target.role === SYSTEM_ADMIN_ROLE_KEY,
+        nextRoleIsSystem: Boolean(targetRole?.isSystem) || target.role === SYSTEM_ADMIN_ROLE_KEY,
+      })
+    ) {
+      throw new UserManagementError("system_role_forbidden");
+    }
+
+    if (banned && target.role === SYSTEM_ADMIN_ROLE_KEY && !target.banned) {
+      const adminCount = await countActiveAdmins(tx);
+      if (adminCount <= 1) {
+        throw new UserManagementError("last_admin");
+      }
+    }
+
+    const reason = banned ? (banReason?.trim().slice(0, 200) || null) : null;
+    await tx
+      .update(user)
+      .set({
+        banned,
+        banReason: reason,
+        banExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, userId));
+
+    if (banned) {
+      await tx.delete(session).where(eq(session.userId, userId));
+    }
+  });
+}
+
+export async function resetUserPassword({
+  userId,
+  password,
+  actorUserId,
+  revokeSessions = true,
+}: {
+  userId: string;
+  password: string;
+  actorUserId: string;
+  revokeSessions?: boolean;
+}) {
+  if (!validateCredentialPassword(password)) {
+    throw new UserManagementError("invalid_input");
+  }
+  if (userId === actorUserId) {
+    throw new UserManagementError("self_forbidden");
+  }
+
+  const hashed = await hashPassword(password);
+
+  return db.transaction(async (tx) => {
+    const [target] = await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1);
+    if (!target) {
+      throw new UserManagementError("not_found");
+    }
+
+    const [credential] = await tx
+      .select({ id: account.id })
+      .from(account)
+      .where(and(eq(account.userId, userId), eq(account.providerId, "credential")))
+      .limit(1);
+    if (!credential) {
+      throw new UserManagementError("no_credential");
+    }
+
+    await tx
+      .update(account)
+      .set({ password: hashed, updatedAt: new Date() })
+      .where(eq(account.id, credential.id));
+
+    if (revokeSessions) {
+      await tx.delete(session).where(eq(session.userId, userId));
+    }
+  });
+}
+
+export async function changeOwnPassword({
+  userId,
+  currentPassword,
+  nextPassword,
+}: {
+  userId: string;
+  currentPassword: string;
+  nextPassword: string;
+}) {
+  if (!currentPassword || !validateCredentialPassword(nextPassword)) {
+    throw new UserManagementError("invalid_input");
+  }
+  if (currentPassword === nextPassword) {
+    throw new UserManagementError("invalid_input");
+  }
+
+  const [credential] = await db
+    .select({ id: account.id, password: account.password })
+    .from(account)
+    .where(and(eq(account.userId, userId), eq(account.providerId, "credential")))
+    .limit(1);
+
+  if (!credential?.password) {
+    throw new UserManagementError("no_credential");
+  }
+
+  const valid = await verifyPassword({ hash: credential.password, password: currentPassword });
+  if (!valid) {
+    throw new UserManagementError("wrong_password");
+  }
+
+  const hashed = await hashPassword(nextPassword);
+  await db
+    .update(account)
+    .set({ password: hashed, updatedAt: new Date() })
+    .where(eq(account.id, credential.id));
+}
+
+export async function revokeAllUserSessions(userId: string) {
+  const [target] = await db.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1);
+  if (!target) {
+    throw new UserManagementError("not_found");
+  }
+  await db.delete(session).where(eq(session.userId, userId));
+}
+
+export async function revokeSessionForUser({
+  sessionId,
+  userId,
+  currentSessionId,
+}: {
+  sessionId: string;
+  userId: string;
+  currentSessionId?: string;
+}) {
+  if (currentSessionId && sessionId === currentSessionId) {
+    throw new UserManagementError("self_forbidden");
+  }
+
+  const [row] = await db
+    .select({ id: session.id, userId: session.userId })
+    .from(session)
+    .where(eq(session.id, sessionId))
+    .limit(1);
+
+  if (!row || row.userId !== userId) {
+    throw new UserManagementError("not_found");
+  }
+
+  await db.delete(session).where(eq(session.id, sessionId));
+}
+
+export async function listSessionsForUser(userId: string) {
+  return db
+    .select({
+      id: session.id,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      expiresAt: session.expiresAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+    })
+    .from(session)
+    .where(and(eq(session.userId, userId), gt(session.expiresAt, new Date())))
+    .orderBy(desc(session.updatedAt));
 }

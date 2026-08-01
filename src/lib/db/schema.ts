@@ -159,8 +159,32 @@ export const menu = pgTable(
   ],
 );
 
+/** Append-only operational audit trail. Rows are never updated or deleted by app code. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    actorUserId: text("actor_user_id").references(() => user.id, { onDelete: "set null" }),
+    actorEmail: text("actor_email"),
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id"),
+    summary: text("summary").notNull(),
+    metadata: text("metadata"),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("audit_log_created_at_idx").on(table.createdAt),
+    index("audit_log_actor_user_id_idx").on(table.actorUserId),
+    index("audit_log_action_idx").on(table.action),
+    index("audit_log_resource_idx").on(table.resourceType, table.resourceId),
+  ],
+);
+
 export type User = typeof user.$inferSelect;
 export type Session = typeof session.$inferSelect;
 export type Role = typeof role.$inferSelect;
 export type Permission = typeof permission.$inferSelect;
 export type Menu = typeof menu.$inferSelect;
+export type AuditLog = typeof auditLog.$inferSelect;

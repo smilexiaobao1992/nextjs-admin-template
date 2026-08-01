@@ -150,6 +150,7 @@ export default async function MenusPage({
                       size="sm"
                       variant="destructive"
                       pendingLabel="删除中…"
+                      confirmLabel="确认删除"
                       confirmMessage={`确认删除菜单“${selected.title}”？存在子菜单时需要先处理子菜单。`}
                     >
                       删除

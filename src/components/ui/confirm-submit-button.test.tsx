@@ -28,7 +28,7 @@ describe("ConfirmSubmitButton", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
-    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认" }));
     expect(submit).toHaveBeenCalledTimes(1);
   });
 });

@@ -41,9 +41,18 @@ async function main() {
       ) as admin_bindings
   `;
   assert(counts.roles === 2, `expected 2 seeded roles, received ${counts.roles}`);
-  assert(counts.permissions === 9, `expected 9 seeded permissions, received ${counts.permissions}`);
-  assert(counts.menus === 6, `expected 6 seeded menus, received ${counts.menus}`);
+  assert(counts.permissions === 10, `expected 10 seeded permissions, received ${counts.permissions}`);
+  assert(counts.menus === 7, `expected 7 seeded menus, received ${counts.menus}`);
   assert(counts.admin_bindings === 0, `expected admin shortcut without stored bindings, received ${counts.admin_bindings}`);
+
+  const auditTable = await sql<{ exists: boolean }[]>`
+    select exists (
+      select 1
+      from information_schema.tables
+      where table_schema = 'public' and table_name = 'audit_log'
+    ) as exists
+  `;
+  assert(auditTable[0]?.exists, "expected audit_log table to exist");
 
   await expectSqlState("single default role", "23505", () =>
     sql.begin(async (tx) => {
