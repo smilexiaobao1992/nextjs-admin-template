@@ -178,39 +178,39 @@ src/
 
 ## 路线图
 
-只做后台**基础设施**，不收录具体业务模块。完成项会打勾。
+只做后台**基础设施**，不收录具体业务模块。✅ 已完成 · ⬜ 未开始。
 
 ### v1.1 可用性
 
-- [x] Docker Compose 本地 PostgreSQL
-- [x] 用户封禁 / 解封、管理员重置密码
-- [x] 列表搜索与分页约定（用户列表、审计列表接入）
-- [x] 真实工作台统计（用户 / 角色 / 会话 / 近 7 日审计）
+- ✅ Docker Compose 本地 PostgreSQL
+- ✅ 用户封禁 / 解封、管理员重置密码
+- ✅ 列表搜索与分页约定（用户列表、审计列表接入）
+- ✅ 真实工作台统计（用户 / 角色 / 会话 / 近 7 日审计）
 
 ### v1.2 可观测
 
-- [x] 操作审计日志（追加写入 + `audit:read` 只读页）
-- [x] 会话管理（个人中心撤销本人会话；管理员撤销他人全部会话）
-- [x] 部署健康检查 `GET /api/health`
+- ✅ 操作审计日志（追加写入 + `audit:read` 只读页）
+- ✅ 会话管理（个人中心撤销本人会话；管理员撤销他人全部会话）
+- ✅ 部署健康检查 `GET /api/health`
 
 ### v1.3 可扩展
 
-- [x] feature 脚手架 `npm run scaffold:feature`
-- [x] OAuth / 2FA / 邮件重置说明文档
-- [x] 状态提示组件统一（`StatusNotice`）
+- ✅ feature 脚手架 `npm run scaffold:feature`
+- ✅ OAuth / 2FA / 邮件重置说明文档
+- ✅ 状态提示组件统一（`StatusNotice`）
 
 ### 开源侧
 
-- [x] CONTRIBUTING
-- [x] Issue / PR 模板
-- [x] README 路线图与命令说明
+- ✅ CONTRIBUTING
+- ✅ Issue / PR 模板
+- ✅ README 路线图与命令说明
 
 ### 后续可选（未排期）
 
-- [ ] 文案 key 化，便于 fork 接入 i18n
-- [ ] 面包屑 / 页面标题壳层约定
-- [ ] 更丰富的 DataTable（排序、列显隐）骨架
-- [ ] 发布版本标签与 CHANGELOG 流程
+- ⬜ 文案 key 化，便于 fork 接入 i18n
+- ⬜ 面包屑 / 页面标题壳层约定
+- ⬜ 更丰富的 DataTable（排序、列显隐）骨架
+- ⬜ 发布版本标签与 CHANGELOG 流程
 
 ## 质量门槛
 
