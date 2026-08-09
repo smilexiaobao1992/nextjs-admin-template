@@ -1,6 +1,6 @@
 # Next.js Admin Template
 
-一个可直接复制的开源管理后台基础模板，保留认证、权限、数据库迁移、响应式后台壳和工程质量门槛，不附带虚假的业务模块。
+一个可直接复制的开源管理后台基础模板，包含认证、权限、数据库迁移、响应式后台壳和工程质量门槛，不预置示例业务模块。
 
 默认界面为**简体中文**（`lang="zh-CN"`）。需要多语言时，在业务层自行接入 i18n。
 
@@ -12,20 +12,31 @@
 
 石墨侧栏、暖白工作区和珊瑚主操作，适合库存、运营和内部管理工具。
 
-![Graphite Workspace 主题设计稿](docs/images/theme-graphite-workspace.png)
+![Graphite Workspace 主题视觉参考](docs/images/theme-graphite-workspace.png)
 
 ### Indigo Cloud
 
 亮色浮层侧栏、冷白画布和靛蓝主操作，适合通用 SaaS 与协作后台。
 
-![Indigo Cloud 主题设计稿](docs/images/theme-indigo-cloud.png)
+![Indigo Cloud 主题视觉参考](docs/images/theme-indigo-cloud.png)
+
+以上图片用于展示两套主题的配色与布局方向，具体页面和功能以当前项目为准。
+
+## 核心功能
+
+- 邮箱密码登录，公开注册默认关闭，通过交互式命令创建管理员账号。
+- 动态 RBAC 权限控制，一个用户可关联多个角色并合并角色权限。
+- 在用户管理弹窗中调整角色、封禁账号、重置密码和撤销会话。
+- 在后台管理角色、权限与菜单，服务端同步校验授权范围。
+- 工作台展示真实的用户、角色、会话与审计统计，列表支持搜索和分页。
+- 两套响应式主题，登录页使用 GSAP 动效，并遵循系统的“减少动态效果”设置。
 
 ## 技术栈
 
 - Next.js 16.3、React 19.2、TypeScript、Tailwind CSS 4
 - Better Auth 1.6，邮箱密码登录与 Admin 插件
 - Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
-- Vitest、Testing Library、ESLint、GitHub Actions
+- GSAP、Vitest、Testing Library、ESLint、GitHub Actions
 - Docker Compose 本地 PostgreSQL 17
 
 ## 已实现的安全边界
@@ -53,16 +64,13 @@
 ## 本地启动
 
 ```bash
-git clone git@github.com:smilexiaobao1992/nextjs-admin-template.git
+git clone https://github.com/smilexiaobao1992/nextjs-admin-template.git
 cd nextjs-admin-template
 npm ci
 cp .env.example .env.local
-docker compose --env-file .env.local up -d   # 或 npm run db:up
 ```
 
-Compose 会显式读取 `.env.local`，PostgreSQL 只绑定到 `127.0.0.1`。共享开发机请通过 `POSTGRES_PASSWORD` 覆盖默认本地密码。
-
-编辑 `.env.local`（若使用仓库自带 Compose，默认值可直接使用）：
+首次启动数据库前编辑 `.env.local`（若使用仓库自带 Compose，默认值可直接使用）：
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
@@ -71,9 +79,15 @@ BETTER_AUTH_SECRET=change-me
 BETTER_AUTH_URL=http://localhost:3002
 ```
 
-先运行 `openssl rand -base64 32`，用输出替换 `change-me`；占位值会被启动校验明确拒绝。
+先运行 `openssl rand -base64 32`，用输出替换 `change-me`；占位值会被启动校验明确拒绝。如果修改 `POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB` 或 `POSTGRES_PORT`，需要同步更新两个数据库连接地址。
 
-然后执行：
+然后启动 PostgreSQL。Compose 会显式读取 `.env.local`，并只将数据库端口绑定到 `127.0.0.1`：
+
+```bash
+docker compose --env-file .env.local up -d   # 或 npm run db:up
+```
+
+数据库健康后执行：
 
 ```bash
 npm run db:migrate
@@ -156,6 +170,7 @@ src/
     api/auth/[...all]/
     api/health/
   features/                    # 业务域（复制后主要加这里）
+    dashboard/                 # 工作台统计查询
     users/
     rbac/                      # 角色 / 权限 / 菜单 Server Actions
   components/
@@ -163,6 +178,7 @@ src/
     layout/                    # AppShell 接收服务端过滤后的 menus
   lib/
     auth/                      # 会话、requirePermission、用户生命周期
+    admin-theme.ts             # 主题解析与默认值
     audit/                     # 审计写入与查询
     list/                      # 列表分页/搜索参数约定
     rbac/                      # 权限解析、校验、CRUD
@@ -208,7 +224,7 @@ src/
 - ✅ CONTRIBUTING
 - ✅ Issue / PR 模板
 - ✅ README 路线图与命令说明
-- ✅ CHANGELOG 与 Dependabot
+- ✅ CHANGELOG
 
 ### 后续可选（未排期）
 
@@ -223,6 +239,7 @@ GitHub Actions 使用 Node.js 24 与 PostgreSQL 17，依次执行：
 
 ```bash
 npm ci
+npm audit --omit=dev --audit-level=high
 npm run db:migrate
 npm run db:verify
 npm run db:verify:security
