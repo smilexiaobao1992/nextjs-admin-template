@@ -17,7 +17,7 @@ Notable changes to this template are documented here. This project follows seman
 - Upgrade Next.js to 16.3.0 and React to 19.2.8.
 - Pin Better Auth to 1.6.23 pending its schema-changing upgrade path.
 - Reduce dashboard query fan-out and cap each application database pool at five connections.
-- Bind Docker Compose PostgreSQL to loopback and add CI security verification and dependency updates.
+- Bind Docker Compose PostgreSQL to loopback and add CI security verification.
 - Support multiple roles per user with unioned permissions and protected role references.
 - Move role, account status, password, and session operations into a user management dialog.
 - Redesign the login page with the graphite and terracotta palette and reduced-motion-aware GSAP animation.
