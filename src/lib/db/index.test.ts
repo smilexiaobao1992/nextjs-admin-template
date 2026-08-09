@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 describe("database client", () => {
-  it("keeps enough pooled connections for parallel dashboard queries", async () => {
+  it("caps each application instance to a conservative connection pool", async () => {
     process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/test";
     const { dbClient } = await import("./index");
 
-    expect(dbClient.options.max).toBeGreaterThanOrEqual(8);
+    expect(dbClient.options.max).toBe(5);
     await dbClient.end();
   });
 });

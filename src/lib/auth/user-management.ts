@@ -1,8 +1,10 @@
 import { hashPassword, verifyPassword } from "better-auth/crypto";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account, role, rolePermission, session, user } from "@/lib/db/schema";
+import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
 import { DEFAULT_MEMBER_ROLE_KEY, SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
+import { hasSystemAdminRole, parseRoleKeys, serializeRoleKeys } from "@/lib/rbac/role-keys";
 import {
   canChangeRole,
   canManageRolePermissionSets,
@@ -40,82 +42,106 @@ export function validateCredentialUserInput({ name, email, password }: { name: s
   return { name: normalizedName, email: normalizedEmail, password };
 }
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function getRoleRows(tx: Transaction, roleKeys: string[]) {
+  const uniqueRoleKeys = parseRoleKeys(roleKeys.join(","));
+  if (uniqueRoleKeys.length === 0) {
+    throw new UserManagementError("invalid_role");
+  }
+  const rows = await tx
+    .select({ id: role.id, key: role.key, isSystem: role.isSystem })
+    .from(role)
+    .where(inArray(role.key, uniqueRoleKeys))
+    .for("key share");
+  if (rows.length !== uniqueRoleKeys.length) {
+    throw new UserManagementError("invalid_role");
+  }
+  return rows;
+}
+
+async function getPermissionIdsForRoles(tx: Transaction, roleIds: string[]) {
+  if (roleIds.length === 0) {
+    return [];
+  }
+  const rows = await tx
+    .select({ id: rolePermission.permissionId })
+    .from(rolePermission)
+    .where(inArray(rolePermission.roleId, roleIds));
+  return [...new Set(rows.map((item) => item.id))];
+}
+
+async function assertCanManageTargetRoles(tx: Transaction, actorRoleValue: string, targetRoleValue: string) {
+  const targetRoles = await getRoleRows(tx, parseRoleKeys(targetRoleValue));
+  const targetHasSystemRole = targetRoles.some(
+    (item) => item.isSystem || item.key === SYSTEM_ADMIN_ROLE_KEY,
+  );
+  if (!canManageSystemRole({
+    actorRole: actorRoleValue,
+    currentRoleIsSystem: targetHasSystemRole,
+    nextRoleIsSystem: targetHasSystemRole,
+  })) {
+    throw new UserManagementError("system_role_forbidden");
+  }
+  if (hasSystemAdminRole(actorRoleValue)) {
+    return;
+  }
+
+  const actorRoles = await getRoleRows(tx, parseRoleKeys(actorRoleValue));
+  const [actorPermissionIds, targetPermissionIds] = await Promise.all([
+    getPermissionIdsForRoles(tx, actorRoles.map((item) => item.id)),
+    getPermissionIdsForRoles(tx, targetRoles.map((item) => item.id)),
+  ]);
+  if (!canManageRolePermissionSets({
+    actorPermissionIds: actorPermissionIds,
+    currentPermissionIds: targetPermissionIds,
+    nextPermissionIds: targetPermissionIds,
+  })) {
+    throw new UserManagementError("role_scope_forbidden");
+  }
+}
+
 export async function createCredentialUser(input: {
   name: string;
   email: string;
   password: string;
-  role?: string;
-}, actorRoleKey: string) {
+  roles?: string[];
+}, actorRoleKey: string, audit: WriteAuditLogInput) {
   const values = validateCredentialUserInput(input);
   const password = await hashPassword(values.password);
 
   return db.transaction(async (tx) => {
-    let resolvedRole = DEFAULT_MEMBER_ROLE_KEY;
-    let resolvedRoleId = "";
-    let resolvedRoleIsSystem = false;
-
-    if (input.role) {
-      const [existingRole] = await tx
-        .select({ id: role.id, key: role.key, isSystem: role.isSystem })
-        .from(role)
-        .where(eq(role.key, input.role))
-        .limit(1);
-      if (!existingRole) {
-        throw new UserManagementError("invalid_role");
-      }
-      if (
-        !canManageSystemRole({
-          actorRole: actorRoleKey,
-          currentRoleIsSystem: false,
-          nextRoleIsSystem: existingRole.isSystem || existingRole.key === SYSTEM_ADMIN_ROLE_KEY,
-        })
-      ) {
-        throw new UserManagementError("system_role_forbidden");
-      }
-      resolvedRole = existingRole.key;
-      resolvedRoleId = existingRole.id;
-      resolvedRoleIsSystem = existingRole.isSystem;
-    } else {
+    let requestedRoleKeys = parseRoleKeys((input.roles ?? []).join(","));
+    if (requestedRoleKeys.length === 0) {
       const [defaultRole] = await tx
-        .select({ id: role.id, key: role.key, isSystem: role.isSystem })
+        .select({ key: role.key })
         .from(role)
         .where(eq(role.isDefault, true))
         .limit(1);
-      if (defaultRole) {
-        resolvedRole = defaultRole.key;
-        resolvedRoleId = defaultRole.id;
-        resolvedRoleIsSystem = defaultRole.isSystem;
-      }
+      requestedRoleKeys = [defaultRole?.key ?? DEFAULT_MEMBER_ROLE_KEY];
     }
 
-    if (!resolvedRoleId) {
-      const [fallbackRole] = await tx
-        .select({ id: role.id, key: role.key, isSystem: role.isSystem })
-        .from(role)
-        .where(eq(role.key, resolvedRole))
-        .limit(1);
-      if (!fallbackRole) {
-        throw new UserManagementError("invalid_role");
-      }
-      resolvedRoleId = fallbackRole.id;
-      resolvedRoleIsSystem = fallbackRole.isSystem;
+    const selectedRoles = await getRoleRows(tx, requestedRoleKeys);
+    const selectedHasSystemRole = selectedRoles.some(
+      (item) => item.isSystem || item.key === SYSTEM_ADMIN_ROLE_KEY,
+    );
+    if (!canManageSystemRole({
+      actorRole: actorRoleKey,
+      currentRoleIsSystem: false,
+      nextRoleIsSystem: selectedHasSystemRole,
+    })) {
+      throw new UserManagementError("system_role_forbidden");
     }
 
-    if (actorRoleKey !== SYSTEM_ADMIN_ROLE_KEY) {
-      if (resolvedRoleIsSystem) {
-        throw new UserManagementError("system_role_forbidden");
-      }
-      const [actorRole] = await tx.select({ id: role.id }).from(role).where(eq(role.key, actorRoleKey)).limit(1);
-      if (!actorRole) {
-        throw new UserManagementError("role_scope_forbidden");
-      }
-      const [actorPermissions, nextPermissions] = await Promise.all([
-        tx.select({ id: rolePermission.permissionId }).from(rolePermission).where(eq(rolePermission.roleId, actorRole.id)),
-        tx.select({ id: rolePermission.permissionId }).from(rolePermission).where(eq(rolePermission.roleId, resolvedRoleId)),
+    if (!hasSystemAdminRole(actorRoleKey)) {
+      const actorRoles = await getRoleRows(tx, parseRoleKeys(actorRoleKey));
+      const [actorPermissionIds, nextPermissionIds] = await Promise.all([
+        getPermissionIdsForRoles(tx, actorRoles.map((item) => item.id)),
+        getPermissionIdsForRoles(tx, selectedRoles.map((item) => item.id)),
       ]);
       if (!canManageRolePermissionSets({
-        actorPermissionIds: actorPermissions.map((item) => item.id),
-        nextPermissionIds: nextPermissions.map((item) => item.id),
+        actorPermissionIds,
+        nextPermissionIds,
       })) {
         throw new UserManagementError("role_scope_forbidden");
       }
@@ -132,7 +158,7 @@ export async function createCredentialUser(input: {
       id: userId,
       name: values.name,
       email: values.email,
-      role: resolvedRole,
+      role: serializeRoleKeys(requestedRoleKeys),
     });
     await tx.insert(account).values({
       id: crypto.randomUUID(),
@@ -141,59 +167,61 @@ export async function createCredentialUser(input: {
       userId,
       password,
     });
+    await writeAuditLog({ ...audit, resourceId: userId }, tx);
 
     return userId;
   });
 }
 
-export async function setUserRole(userId: string, nextRole: string, actorRoleKey: string) {
+export async function setUserRoles(
+  userId: string,
+  nextRoles: string[],
+  actorRoleKey: string,
+  audit: WriteAuditLogInput,
+) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select id from "user" where role = ${SYSTEM_ADMIN_ROLE_KEY} for update`);
-
-    const [roleRow] = await tx
-      .select({ id: role.id, key: role.key, isSystem: role.isSystem })
-      .from(role)
-      .where(eq(role.key, nextRole))
-      .limit(1);
-    if (!roleRow) {
-      throw new UserManagementError("invalid_role");
-    }
+    await tx.execute(
+      sql`select id from "user" where ${SYSTEM_ADMIN_ROLE_KEY} = any(string_to_array(role, ',')) for update`,
+    );
 
     const [target] = await tx.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, userId)).limit(1);
     if (!target) {
       throw new UserManagementError("not_found");
     }
 
-    const [currentRoleRow] = await tx
-      .select({ id: role.id, isSystem: role.isSystem })
-      .from(role)
-      .where(eq(role.key, target.role))
-      .limit(1);
+    const nextRoleKeys = parseRoleKeys(nextRoles.join(","));
+    const [currentRoleRows, nextRoleRows] = await Promise.all([
+      getRoleRows(tx, parseRoleKeys(target.role)),
+      getRoleRows(tx, nextRoleKeys),
+    ]);
+    const currentHasSystemRole = currentRoleRows.some(
+      (item) => item.isSystem || item.key === SYSTEM_ADMIN_ROLE_KEY,
+    );
+    const nextHasSystemRole = nextRoleRows.some(
+      (item) => item.isSystem || item.key === SYSTEM_ADMIN_ROLE_KEY,
+    );
 
     if (
       !canManageSystemRole({
         actorRole: actorRoleKey,
-        currentRoleIsSystem: Boolean(currentRoleRow?.isSystem) || target.role === SYSTEM_ADMIN_ROLE_KEY,
-        nextRoleIsSystem: roleRow.isSystem || roleRow.key === SYSTEM_ADMIN_ROLE_KEY,
+        currentRoleIsSystem: currentHasSystemRole,
+        nextRoleIsSystem: nextHasSystemRole,
       })
     ) {
       throw new UserManagementError("system_role_forbidden");
     }
 
-    if (actorRoleKey !== SYSTEM_ADMIN_ROLE_KEY) {
-      const [actorRole] = await tx.select({ id: role.id }).from(role).where(eq(role.key, actorRoleKey)).limit(1);
-      if (!actorRole || !currentRoleRow) {
-        throw new UserManagementError("role_scope_forbidden");
-      }
-      const [actorPermissions, currentPermissions, nextPermissions] = await Promise.all([
-        tx.select({ id: rolePermission.permissionId }).from(rolePermission).where(eq(rolePermission.roleId, actorRole.id)),
-        tx.select({ id: rolePermission.permissionId }).from(rolePermission).where(eq(rolePermission.roleId, currentRoleRow.id)),
-        tx.select({ id: rolePermission.permissionId }).from(rolePermission).where(eq(rolePermission.roleId, roleRow.id)),
+    if (!hasSystemAdminRole(actorRoleKey)) {
+      const actorRoles = await getRoleRows(tx, parseRoleKeys(actorRoleKey));
+      const [actorPermissionIds, currentPermissionIds, nextPermissionIds] = await Promise.all([
+        getPermissionIdsForRoles(tx, actorRoles.map((item) => item.id)),
+        getPermissionIdsForRoles(tx, currentRoleRows.map((item) => item.id)),
+        getPermissionIdsForRoles(tx, nextRoleRows.map((item) => item.id)),
       ]);
       if (!canManageRolePermissionSets({
-        actorPermissionIds: actorPermissions.map((item) => item.id),
-        currentPermissionIds: currentPermissions.map((item) => item.id),
-        nextPermissionIds: nextPermissions.map((item) => item.id),
+        actorPermissionIds,
+        currentPermissionIds,
+        nextPermissionIds,
       })) {
         throw new UserManagementError("role_scope_forbidden");
       }
@@ -202,13 +230,18 @@ export async function setUserRole(userId: string, nextRole: string, actorRoleKey
     const admins = await tx
       .select({ id: user.id })
       .from(user)
-      .where(and(eq(user.role, SYSTEM_ADMIN_ROLE_KEY), eq(user.banned, false)));
+      .where(and(
+        sql`${SYSTEM_ADMIN_ROLE_KEY} = any(string_to_array(${user.role}, ','))`,
+        eq(user.banned, false),
+      ));
 
-    if (!canChangeRole({ currentRole: target.role, nextRole: roleRow.key, adminCount: admins.length })) {
+    const serializedNextRoles = serializeRoleKeys(nextRoleKeys);
+    if (!canChangeRole({ currentRole: target.role, nextRole: serializedNextRoles, adminCount: admins.length })) {
       throw new UserManagementError("last_admin");
     }
 
-    await tx.update(user).set({ role: roleRow.key, updatedAt: new Date() }).where(eq(user.id, userId));
+    await tx.update(user).set({ role: serializedNextRoles, updatedAt: new Date() }).where(eq(user.id, userId));
+    await writeAuditLog(audit, tx);
   });
 }
 
@@ -216,7 +249,10 @@ async function countActiveAdmins(tx: Parameters<Parameters<typeof db.transaction
   const admins = await tx
     .select({ id: user.id })
     .from(user)
-    .where(and(eq(user.role, SYSTEM_ADMIN_ROLE_KEY), eq(user.banned, false)));
+    .where(and(
+      sql`${SYSTEM_ADMIN_ROLE_KEY} = any(string_to_array(${user.role}, ','))`,
+      eq(user.banned, false),
+    ));
   return admins.length;
 }
 
@@ -226,19 +262,23 @@ export async function setUserBanned({
   banReason,
   actorUserId,
   actorRoleKey,
+  audit,
 }: {
   userId: string;
   banned: boolean;
   banReason?: string | null;
   actorUserId: string;
   actorRoleKey: string;
+  audit: WriteAuditLogInput;
 }) {
   if (userId === actorUserId) {
     throw new UserManagementError("self_forbidden");
   }
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select id from "user" where role = ${SYSTEM_ADMIN_ROLE_KEY} for update`);
+    await tx.execute(
+      sql`select id from "user" where ${SYSTEM_ADMIN_ROLE_KEY} = any(string_to_array(role, ',')) for update`,
+    );
 
     const [target] = await tx
       .select({ id: user.id, role: user.role, banned: user.banned })
@@ -249,23 +289,9 @@ export async function setUserBanned({
       throw new UserManagementError("not_found");
     }
 
-    const [targetRole] = await tx
-      .select({ isSystem: role.isSystem })
-      .from(role)
-      .where(eq(role.key, target.role))
-      .limit(1);
+    await assertCanManageTargetRoles(tx, actorRoleKey, target.role);
 
-    if (
-      !canManageSystemRole({
-        actorRole: actorRoleKey,
-        currentRoleIsSystem: Boolean(targetRole?.isSystem) || target.role === SYSTEM_ADMIN_ROLE_KEY,
-        nextRoleIsSystem: Boolean(targetRole?.isSystem) || target.role === SYSTEM_ADMIN_ROLE_KEY,
-      })
-    ) {
-      throw new UserManagementError("system_role_forbidden");
-    }
-
-    if (banned && target.role === SYSTEM_ADMIN_ROLE_KEY && !target.banned) {
+    if (banned && hasSystemAdminRole(target.role) && !target.banned) {
       const adminCount = await countActiveAdmins(tx);
       if (adminCount <= 1) {
         throw new UserManagementError("last_admin");
@@ -286,6 +312,7 @@ export async function setUserBanned({
     if (banned) {
       await tx.delete(session).where(eq(session.userId, userId));
     }
+    await writeAuditLog(audit, tx);
   });
 }
 
@@ -293,12 +320,16 @@ export async function resetUserPassword({
   userId,
   password,
   actorUserId,
+  actorRoleKey,
   revokeSessions = true,
+  audit,
 }: {
   userId: string;
   password: string;
   actorUserId: string;
+  actorRoleKey: string;
   revokeSessions?: boolean;
+  audit: WriteAuditLogInput;
 }) {
   if (!validateCredentialPassword(password)) {
     throw new UserManagementError("invalid_input");
@@ -310,10 +341,11 @@ export async function resetUserPassword({
   const hashed = await hashPassword(password);
 
   return db.transaction(async (tx) => {
-    const [target] = await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1);
+    const [target] = await tx.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, userId)).limit(1);
     if (!target) {
       throw new UserManagementError("not_found");
     }
+    await assertCanManageTargetRoles(tx, actorRoleKey, target.role);
 
     const [credential] = await tx
       .select({ id: account.id })
@@ -332,6 +364,7 @@ export async function resetUserPassword({
     if (revokeSessions) {
       await tx.delete(session).where(eq(session.userId, userId));
     }
+    await writeAuditLog(audit, tx);
   });
 }
 
@@ -339,10 +372,12 @@ export async function changeOwnPassword({
   userId,
   currentPassword,
   nextPassword,
+  audit,
 }: {
   userId: string;
   currentPassword: string;
   nextPassword: string;
+  audit: WriteAuditLogInput;
 }) {
   if (!currentPassword || !validateCredentialPassword(nextPassword)) {
     throw new UserManagementError("invalid_input");
@@ -367,44 +402,69 @@ export async function changeOwnPassword({
   }
 
   const hashed = await hashPassword(nextPassword);
-  await db
-    .update(account)
-    .set({ password: hashed, updatedAt: new Date() })
-    .where(eq(account.id, credential.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(account)
+      .set({ password: hashed, updatedAt: new Date() })
+      .where(eq(account.id, credential.id));
+    await writeAuditLog(audit, tx);
+  });
 }
 
-export async function revokeAllUserSessions(userId: string) {
-  const [target] = await db.select({ id: user.id }).from(user).where(eq(user.id, userId)).limit(1);
-  if (!target) {
-    throw new UserManagementError("not_found");
+export async function revokeAllUserSessions({
+  userId,
+  actorUserId,
+  actorRoleKey,
+  audit,
+}: {
+  userId: string;
+  actorUserId: string;
+  actorRoleKey: string;
+  audit: WriteAuditLogInput;
+}) {
+  if (userId === actorUserId) {
+    throw new UserManagementError("self_forbidden");
   }
-  await db.delete(session).where(eq(session.userId, userId));
+  return db.transaction(async (tx) => {
+    const [target] = await tx.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, userId)).limit(1);
+    if (!target) {
+      throw new UserManagementError("not_found");
+    }
+    await assertCanManageTargetRoles(tx, actorRoleKey, target.role);
+    await tx.delete(session).where(eq(session.userId, userId));
+    await writeAuditLog(audit, tx);
+  });
 }
 
 export async function revokeSessionForUser({
   sessionId,
   userId,
   currentSessionId,
+  audit,
 }: {
   sessionId: string;
   userId: string;
   currentSessionId?: string;
+  audit: WriteAuditLogInput;
 }) {
   if (currentSessionId && sessionId === currentSessionId) {
     throw new UserManagementError("self_forbidden");
   }
 
-  const [row] = await db
-    .select({ id: session.id, userId: session.userId })
-    .from(session)
-    .where(eq(session.id, sessionId))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ id: session.id, userId: session.userId })
+      .from(session)
+      .where(eq(session.id, sessionId))
+      .limit(1);
 
-  if (!row || row.userId !== userId) {
-    throw new UserManagementError("not_found");
-  }
+    if (!row || row.userId !== userId) {
+      throw new UserManagementError("not_found");
+    }
 
-  await db.delete(session).where(eq(session.id, sessionId));
+    await tx.delete(session).where(eq(session.id, sessionId));
+    await writeAuditLog(audit, tx);
+  });
 }
 
 export async function listSessionsForUser(userId: string) {

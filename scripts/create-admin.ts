@@ -59,8 +59,14 @@ async function main() {
   }
 
   await createCredentialUser(
-    { name, email, password, role: SYSTEM_ADMIN_ROLE_KEY },
+    { name, email, password, roles: [SYSTEM_ADMIN_ROLE_KEY] },
     SYSTEM_ADMIN_ROLE_KEY,
+    {
+      actor: { userId: null, email: email.trim().toLowerCase() },
+      action: "admin.bootstrap_create",
+      resourceType: "user",
+      summary: "通过本地脚本创建初始管理员",
+    },
   );
   process.stdout.write(`管理员 ${email.trim().toLowerCase()} 已创建。\n`);
 }

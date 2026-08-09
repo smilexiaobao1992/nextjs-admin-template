@@ -63,9 +63,30 @@ async function main() {
     }),
   );
 
-  await expectSqlState("referenced role delete", "23503", () =>
+  await expectSqlState("invalid multi-role format", "23514", () =>
     sql.begin(async (tx) => {
-      await tx`insert into role (id, key, name) values ('verify_role', 'verify-role', 'Verify role')`;
+      await tx`
+        insert into "user" (id, name, email, role)
+        values ('verify_user', 'Verify user', 'verify-user@example.invalid', 'member,')
+      `;
+    }),
+  );
+
+  await expectSqlState("unknown role reference", "23503", () =>
+    sql.begin(async (tx) => {
+      await tx`
+        insert into "user" (id, name, email, role)
+        values ('verify_user', 'Verify user', 'verify-user@example.invalid', 'member,verify-missing-role')
+      `;
+    }),
+  );
+
+  await expectSqlState("assigned role delete", "23503", () =>
+    sql.begin(async (tx) => {
+      await tx`
+        insert into role (id, key, name)
+        values ('verify_role', 'verify-role', 'Verify role')
+      `;
       await tx`
         insert into "user" (id, name, email, role)
         values ('verify_user', 'Verify user', 'verify-user@example.invalid', 'verify-role')

@@ -21,6 +21,9 @@ export function validateBetterAuthSecret(value: string | undefined): string {
 
 export function validateBetterAuthUrl(value: string | undefined): string | undefined {
   if (!value) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("BETTER_AUTH_URL is required in production.");
+    }
     return undefined;
   }
 
@@ -28,6 +31,14 @@ export function validateBetterAuthUrl(value: string | undefined): string | undef
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       throw new Error("BETTER_AUTH_URL must use http or https.");
+    }
+    const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (
+      process.env.NODE_ENV === "production" &&
+      url.protocol !== "https:" &&
+      !localHostnames.has(url.hostname)
+    ) {
+      throw new Error("BETTER_AUTH_URL must use https in production.");
     }
     return value;
   } catch (error) {

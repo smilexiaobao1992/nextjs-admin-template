@@ -1,21 +1,8 @@
 import { headers } from "next/headers";
-import { db } from "@/lib/db";
-import { auditLog } from "@/lib/db/schema";
+import type { AuditActor } from "./persistence";
 
-export type AuditActor = {
-  userId: string | null;
-  email: string | null;
-};
-
-export type WriteAuditLogInput = {
-  actor: AuditActor;
-  action: string;
-  resourceType: string;
-  resourceId?: string | null;
-  summary: string;
-  metadata?: Record<string, unknown> | null;
-  ipAddress?: string | null;
-};
+export { writeAuditLog } from "./persistence";
+export type { AuditActor, WriteAuditLogInput } from "./persistence";
 
 export async function getRequestIpAddress(): Promise<string | null> {
   const headerStore = await headers();
@@ -24,21 +11,6 @@ export async function getRequestIpAddress(): Promise<string | null> {
     return forwarded.split(",")[0]?.trim() || null;
   }
   return headerStore.get("x-real-ip");
-}
-
-/** Insert one immutable audit row. Failures are thrown so callers can decide. */
-export async function writeAuditLog(input: WriteAuditLogInput) {
-  await db.insert(auditLog).values({
-    id: crypto.randomUUID(),
-    actorUserId: input.actor.userId,
-    actorEmail: input.actor.email,
-    action: input.action,
-    resourceType: input.resourceType,
-    resourceId: input.resourceId ?? null,
-    summary: input.summary,
-    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-    ipAddress: input.ipAddress ?? null,
-  });
 }
 
 export function actorFromSession(session: {

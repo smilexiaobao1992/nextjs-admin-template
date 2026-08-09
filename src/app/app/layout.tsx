@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import AppShell from "@/components/layout/app-shell";
 import { buildLoginHref } from "@/lib/auth/authorization";
 import { getRequestPathname, getSession } from "@/lib/auth/session";
-import { getRoleByKey, listMenusForRoleKey } from "@/lib/rbac/permissions";
+import { listMenusForRoleKey, listRolesForRoleValue } from "@/lib/rbac/permissions";
 import { ADMIN_THEME_COOKIE, parseAdminTheme } from "@/lib/admin-theme";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,9 +14,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const roleKey = session.user.role ?? "member";
-  const [menus, roleRow] = await Promise.all([
+  const [menus, roleRows] = await Promise.all([
     listMenusForRoleKey(roleKey),
-    getRoleByKey(roleKey),
+    listRolesForRoleValue(roleKey),
   ]);
 
   return (
@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         name: session.user.name,
         email: session.user.email,
         role: roleKey,
-        roleLabel: roleRow?.name ?? roleKey,
+        roleLabel: roleRows.map((item) => item.name).join("、") || roleKey,
       }}
       menus={menus}
       initialTheme={parseAdminTheme(cookieStore.get(ADMIN_THEME_COOKIE)?.value)}

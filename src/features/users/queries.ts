@@ -1,6 +1,6 @@
-import { asc, count, desc, eq, gt, ilike, or, type SQL } from "drizzle-orm";
+import { asc, count, desc, ilike, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { role, session, user } from "@/lib/db/schema";
+import { user } from "@/lib/db/schema";
 import { clampPage, escapeLikePattern, type ParsedListQuery } from "@/lib/list/pagination";
 
 function userSearchCondition(q: string): SQL | undefined {
@@ -19,7 +19,15 @@ export async function listUsersPage(query: ParsedListQuery) {
   const offset = (page - 1) * query.pageSize;
 
   const items = await db
-    .select()
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      banned: user.banned,
+      banReason: user.banReason,
+      createdAt: user.createdAt,
+    })
     .from(user)
     .where(where)
     .orderBy(asc(user.createdAt))
@@ -29,34 +37,7 @@ export async function listUsersPage(query: ParsedListQuery) {
   return { items, total, page, pageSize: query.pageSize, q: query.q };
 }
 
-export async function listUsers() {
-  return db.select().from(user).orderBy(asc(user.createdAt));
-}
-
-export type ListedUser = Awaited<ReturnType<typeof listUsers>>[number];
-
-export async function countUsers() {
-  const [row] = await db.select({ value: count() }).from(user);
-  return Number(row?.value ?? 0);
-}
-
-export async function countBannedUsers() {
-  const [row] = await db.select({ value: count() }).from(user).where(eq(user.banned, true));
-  return Number(row?.value ?? 0);
-}
-
-export async function countActiveSessions() {
-  const [row] = await db
-    .select({ value: count() })
-    .from(session)
-    .where(gt(session.expiresAt, new Date()));
-  return Number(row?.value ?? 0);
-}
-
-export async function countRoles() {
-  const [row] = await db.select({ value: count() }).from(role);
-  return Number(row?.value ?? 0);
-}
+export type ListedUser = Awaited<ReturnType<typeof listUsersPage>>["items"][number];
 
 export async function listRecentUsers(limit = 5) {
   return db

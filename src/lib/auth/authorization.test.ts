@@ -14,6 +14,7 @@ describe("authorization helpers", () => {
     expect(isAdminSession(null)).toBe(false);
     expect(isAdminSession({ user: { role: "user" } })).toBe(false);
     expect(isAdminSession({ user: { role: "admin" } })).toBe(true);
+    expect(isAdminSession({ user: { role: "ops,admin" } })).toBe(true);
   });
 
   it("applies one strong-password rule to all credential users", () => {
@@ -43,6 +44,7 @@ describe("authorization helpers", () => {
     expect(canChangeRole({ currentRole: "admin", nextRole: "member", adminCount: 2 })).toBe(true);
     expect(canChangeRole({ currentRole: "member", nextRole: "admin", adminCount: 1 })).toBe(true);
     expect(canChangeRole({ currentRole: "admin", nextRole: "admin", adminCount: 1 })).toBe(true);
+    expect(canChangeRole({ currentRole: "member,admin", nextRole: "member,ops", adminCount: 1 })).toBe(false);
   });
 
   it("allows only an administrator to grant or remove a system role", () => {
@@ -51,6 +53,7 @@ describe("authorization helpers", () => {
     expect(canManageSystemRole({ actorRole: "member", currentRoleIsSystem: false, nextRoleIsSystem: false })).toBe(true);
     expect(canManageSystemRole({ actorRole: "admin", currentRoleIsSystem: false, nextRoleIsSystem: true })).toBe(true);
     expect(canManageSystemRole({ actorRole: "admin", currentRoleIsSystem: true, nextRoleIsSystem: false })).toBe(true);
+    expect(canManageSystemRole({ actorRole: "ops,admin", currentRoleIsSystem: true, nextRoleIsSystem: false })).toBe(true);
   });
 
   it("prevents delegated user managers from assigning or editing roles above their own permissions", () => {

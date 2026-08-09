@@ -22,7 +22,7 @@
 
 ## 技术栈
 
-- Next.js 16.2、React 19、TypeScript、Tailwind CSS 4
+- Next.js 16.3、React 19.2、TypeScript、Tailwind CSS 4
 - Better Auth 1.6，邮箱密码登录与 Admin 插件
 - Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
 - Vitest、Testing Library、ESLint、GitHub Actions
@@ -31,7 +31,7 @@
 ## 已实现的安全边界
 
 - 公开注册默认关闭，只保留 Better Auth 官方 `/api/auth/[...all]` handler。
-- `/app` 在服务端校验会话；业务页与 Server Action 使用动态权限（`requirePermission`）。
+- `/app` 使用 `dashboard:view`；业务页与 Server Action 使用动态权限（`requirePermission`）。
 - 角色 / 权限 / 菜单可在后台管理；`admin` 为系统超管，`member` 为默认可配置角色。
 - 未登录访问受保护路径会跳到 `/login?next=…`，登录后回到安全的本地路径。
 - Better Auth Admin 插件只保留只读用户列表权限；写操作走带事务保护的 Server Action。
@@ -39,7 +39,8 @@
 - 认证端点使用数据库限速，适用于 Vercel 多实例。
 - 创建账号统一要求至少 12 位密码，并同时包含字母和数字。
 - `BETTER_AUTH_SECRET` 至少 32 字节；数据库事务保证至少保留一个未封禁的 `admin`。
-- 关键写操作写入追加型审计日志；用户封禁会撤销其全部会话。
+- 委派管理员只能管理自己已有权限范围内的角色与用户，不能修改系统角色或管理员账号。
+- 关键写操作与追加型审计日志在同一事务提交；用户封禁会撤销其全部会话。
 
 更多说明见 [SECURITY.md](SECURITY.md)。认证扩展（OAuth / 2FA / 邮件重置）见 [docs/auth-extensions.md](docs/auth-extensions.md)。
 
@@ -56,8 +57,10 @@ git clone git@github.com:smilexiaobao1992/nextjs-admin-template.git
 cd nextjs-admin-template
 npm ci
 cp .env.example .env.local
-docker compose up -d   # 或 npm run db:up
+docker compose --env-file .env.local up -d   # 或 npm run db:up
 ```
+
+Compose 会显式读取 `.env.local`，PostgreSQL 只绑定到 `127.0.0.1`。共享开发机请通过 `POSTGRES_PASSWORD` 覆盖默认本地密码。
 
 编辑 `.env.local`（若使用仓库自带 Compose，默认值可直接使用）：
 
@@ -65,7 +68,7 @@ docker compose up -d   # 或 npm run db:up
 DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
 DIRECT_DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
 BETTER_AUTH_SECRET=change-me
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:3002
 ```
 
 先运行 `openssl rand -base64 32`，用输出替换 `change-me`；占位值会被启动校验明确拒绝。
@@ -78,7 +81,7 @@ npm run admin:create
 npm run dev
 ```
 
-浏览器打开 [http://localhost:3000](http://localhost:3000)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。
+浏览器打开 [http://localhost:3002](http://localhost:3002)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。
 
 部署健康检查：`GET /api/health`（检查数据库连通性，不暴露密钥）。
 
@@ -117,6 +120,7 @@ alter default privileges for role postgres in schema public
 | `npm run db:generate` | 根据 schema 生成迁移 |
 | `npm run db:migrate` | 执行已提交迁移 |
 | `npm run db:verify` | 验证种子数据和关键数据库约束 |
+| `npm run db:verify:security` | 验证越权防护与审计事务原子性 |
 | `npm run db:studio` | 打开 Drizzle Studio |
 | `npm run admin:create` | 交互式创建管理员 |
 | `npm run scaffold:feature -- <name>` | 生成 feature 与页面骨架 |
@@ -126,7 +130,7 @@ alter default privileges for role postgres in schema public
 | 路由 | 权限 |
 | --- | --- |
 | `/login` | 公开（已登录会跳转到安全的 `next` 或 `/app`） |
-| `/app` | 已登录用户（真实聚合统计；菜单仍按权限过滤） |
+| `/app` | `dashboard:view`（统计卡片还会按用户 / 角色 / 审计权限裁剪） |
 | `/app/users` | `users:read` / 写操作用 `users:write`（含封禁、重置密码、撤销会话） |
 | `/app/roles` | `roles:read` / `roles:write` |
 | `/app/permissions` | `permissions:read` / `permissions:write` |
@@ -173,27 +177,27 @@ src/
 2. **新业务页**：`npm run scaffold:feature -- orders`，或手动建 `src/features/<domain>/` + `src/app/app/<route>/page.tsx`；在「菜单管理」加侧栏入口并绑定权限。
 3. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
 4. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查是安全层。
-5. 关键写操作调用 `writeAuditLog`。
+5. 关键写操作与 `writeAuditLog` 必须使用同一个数据库事务。
 6. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
 
 ## 路线图
 
 只做后台**基础设施**，不收录具体业务模块。✅ 已完成 · ⬜ 未开始。
 
-### v1.1 可用性
+### 阶段 1：可用性
 
 - ✅ Docker Compose 本地 PostgreSQL
 - ✅ 用户封禁 / 解封、管理员重置密码
 - ✅ 列表搜索与分页约定（用户列表、审计列表接入）
 - ✅ 真实工作台统计（用户 / 角色 / 会话 / 近 7 日审计）
 
-### v1.2 可观测
+### 阶段 2：可观测
 
 - ✅ 操作审计日志（追加写入 + `audit:read` 只读页）
 - ✅ 会话管理（个人中心撤销本人会话；管理员撤销他人全部会话）
 - ✅ 部署健康检查 `GET /api/health`
 
-### v1.3 可扩展
+### 阶段 3：可扩展
 
 - ✅ feature 脚手架 `npm run scaffold:feature`
 - ✅ OAuth / 2FA / 邮件重置说明文档
@@ -204,13 +208,14 @@ src/
 - ✅ CONTRIBUTING
 - ✅ Issue / PR 模板
 - ✅ README 路线图与命令说明
+- ✅ CHANGELOG 与 Dependabot
 
 ### 后续可选（未排期）
 
 - ⬜ 文案 key 化，便于 fork 接入 i18n
 - ⬜ 面包屑 / 页面标题壳层约定
 - ⬜ 更丰富的 DataTable（排序、列显隐）骨架
-- ⬜ 发布版本标签与 CHANGELOG 流程
+- ⬜ 发布版本标签与自动化发布流程
 
 ## 质量门槛
 
@@ -220,9 +225,12 @@ GitHub Actions 使用 Node.js 24 与 PostgreSQL 17，依次执行：
 npm ci
 npm run db:migrate
 npm run db:verify
+npm run db:verify:security
 npm run check
 npm run build
 ```
+
+Better Auth 当前固定为 `1.6.23`。升级到 `1.6.24+` 前应先审查官方迁移说明、生成并审核 schema 迁移，再验证真实登录、会话与 Admin 插件流程。
 
 本地推荐同样跑 `npm run check` 与 `npm run build`。贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

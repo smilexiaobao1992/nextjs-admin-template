@@ -70,6 +70,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { actorFromSession, getRequestIpAddress, writeAuditLog } from "@/lib/audit/log";
 import { requirePermission } from "@/lib/auth/session";
+import { db } from "@/lib/db";
 
 // Wire permission keys in the admin UI first:
 //   ${resource}:read
@@ -79,13 +80,16 @@ export async function create${pascal}Action(formData: FormData) {
   const session = await requirePermission("${resource}:write");
   void formData;
 
-  // TODO: validate input, write to database, then audit.
-  await writeAuditLog({
-    actor: actorFromSession(session),
-    action: "${resource}.create",
-    resourceType: "${resource}",
-    summary: "创建 ${title}",
-    ipAddress: await getRequestIpAddress(),
+  // Keep the protected mutation and its audit row in one transaction.
+  await db.transaction(async (tx) => {
+    // TODO: validate input and write the domain record with tx.
+    await writeAuditLog({
+      actor: actorFromSession(session),
+      action: "${resource}.create",
+      resourceType: "${resource}",
+      summary: "创建 ${title}",
+      ipAddress: await getRequestIpAddress(),
+    }, tx);
   });
 
   revalidatePath("/app/${feature}");

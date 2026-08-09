@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { actorFromSession, getRequestIpAddress, writeAuditLog } from "@/lib/audit/log";
+import { actorFromSession, getRequestIpAddress, type WriteAuditLogInput } from "@/lib/audit/log";
 import { requirePermission, requireSession } from "@/lib/auth/session";
 import {
   changeOwnPassword,
@@ -11,7 +11,7 @@ import {
   revokeAllUserSessions,
   revokeSessionForUser,
   setUserBanned,
-  setUserRole,
+  setUserRoles,
   UserManagementError,
 } from "@/lib/auth/user-management";
 
@@ -30,27 +30,35 @@ function revalidateUserSurfaces() {
   revalidatePath("/app/audit");
 }
 
+async function auditFor(
+  session: { user: { id: string; email: string } },
+  input: Omit<WriteAuditLogInput, "actor" | "ipAddress">,
+): Promise<WriteAuditLogInput> {
+  return {
+    ...input,
+    actor: actorFromSession(session),
+    ipAddress: await getRequestIpAddress(),
+  };
+}
+
 export async function createUserAction(formData: FormData) {
   const session = await requirePermission("users:write");
 
   try {
-    const userId = await createCredentialUser(
+    await createCredentialUser(
       {
         name: String(formData.get("name") ?? ""),
         email: String(formData.get("email") ?? ""),
         password: String(formData.get("password") ?? ""),
-        role: String(formData.get("role") ?? "") || undefined,
+        roles: formData.getAll("roles").map(String),
       },
       session.user.role ?? "",
+      await auditFor(session, {
+        action: "user.create",
+        resourceType: "user",
+        summary: `创建用户 ${String(formData.get("email") ?? "").trim().toLowerCase()}`,
+      }),
     );
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: "user.create",
-      resourceType: "user",
-      resourceId: userId,
-      summary: `创建用户 ${String(formData.get("email") ?? "").trim().toLowerCase()}`,
-      ipAddress: await getRequestIpAddress(),
-    });
   } catch (error) {
     redirect(`/app/users?notice=${noticeFor(error)}`);
   }
@@ -59,26 +67,23 @@ export async function createUserAction(formData: FormData) {
   redirect("/app/users?notice=created");
 }
 
-export async function setUserRoleAction(formData: FormData) {
+export async function setUserRolesAction(formData: FormData) {
   const session = await requirePermission("users:write");
   const userId = String(formData.get("userId") ?? "");
-  const requestedRole = String(formData.get("role") ?? "");
+  const requestedRoles = formData.getAll("roles").map(String).filter(Boolean);
 
-  if (!userId || !requestedRole) {
+  if (!userId || requestedRoles.length === 0) {
     redirect("/app/users?notice=invalid_input");
   }
 
   try {
-    await setUserRole(userId, requestedRole, session.user.role ?? "");
-    await writeAuditLog({
-      actor: actorFromSession(session),
+    await setUserRoles(userId, requestedRoles, session.user.role ?? "", await auditFor(session, {
       action: "user.role_update",
       resourceType: "user",
       resourceId: userId,
-      summary: `将用户角色更新为 ${requestedRole}`,
-      metadata: { role: requestedRole },
-      ipAddress: await getRequestIpAddress(),
-    });
+      summary: `更新用户角色为 ${requestedRoles.join(", ")}`,
+      metadata: { roles: requestedRoles },
+    }));
   } catch (error) {
     redirect(`/app/users?notice=${noticeFor(error)}`);
   }
@@ -104,15 +109,13 @@ export async function setUserBannedAction(formData: FormData) {
       banReason,
       actorUserId: session.user.id,
       actorRoleKey: session.user.role ?? "",
-    });
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: banned ? "user.ban" : "user.unban",
-      resourceType: "user",
-      resourceId: userId,
-      summary: banned ? "封禁用户" : "解封用户",
-      metadata: banned && banReason ? { banReason } : null,
-      ipAddress: await getRequestIpAddress(),
+      audit: await auditFor(session, {
+        action: banned ? "user.ban" : "user.unban",
+        resourceType: "user",
+        resourceId: userId,
+        summary: banned ? "封禁用户" : "解封用户",
+        metadata: banned && banReason ? { banReason } : null,
+      }),
     });
   } catch (error) {
     redirect(`/app/users?notice=${noticeFor(error)}`);
@@ -136,15 +139,14 @@ export async function resetUserPasswordAction(formData: FormData) {
       userId,
       password,
       actorUserId: session.user.id,
+      actorRoleKey: session.user.role ?? "",
       revokeSessions: true,
-    });
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: "user.password_reset",
-      resourceType: "user",
-      resourceId: userId,
-      summary: "重置用户密码并撤销其会话",
-      ipAddress: await getRequestIpAddress(),
+      audit: await auditFor(session, {
+        action: "user.password_reset",
+        resourceType: "user",
+        resourceId: userId,
+        summary: "重置用户密码并撤销其会话",
+      }),
     });
   } catch (error) {
     redirect(`/app/users?notice=${noticeFor(error)}`);
@@ -163,14 +165,16 @@ export async function revokeUserSessionsAction(formData: FormData) {
   }
 
   try {
-    await revokeAllUserSessions(userId);
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: "user.sessions_revoke",
-      resourceType: "user",
-      resourceId: userId,
-      summary: "撤销用户全部会话",
-      ipAddress: await getRequestIpAddress(),
+    await revokeAllUserSessions({
+      userId,
+      actorUserId: session.user.id,
+      actorRoleKey: session.user.role ?? "",
+      audit: await auditFor(session, {
+        action: "user.sessions_revoke",
+        resourceType: "user",
+        resourceId: userId,
+        summary: "撤销用户全部会话",
+      }),
     });
   } catch (error) {
     redirect(`/app/users?notice=${noticeFor(error)}`);
@@ -195,14 +199,12 @@ export async function changeOwnPasswordAction(formData: FormData) {
       userId: session.user.id,
       currentPassword,
       nextPassword,
-    });
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: "user.password_change",
-      resourceType: "user",
-      resourceId: session.user.id,
-      summary: "修改本人密码",
-      ipAddress: await getRequestIpAddress(),
+      audit: await auditFor(session, {
+        action: "user.password_change",
+        resourceType: "user",
+        resourceId: session.user.id,
+        summary: "修改本人密码",
+      }),
     });
   } catch (error) {
     redirect(`/app/profile?notice=${noticeFor(error)}`);
@@ -225,14 +227,12 @@ export async function revokeOwnSessionAction(formData: FormData) {
       sessionId,
       userId: session.user.id,
       currentSessionId: session.session.id,
-    });
-    await writeAuditLog({
-      actor: actorFromSession(session),
-      action: "session.revoke",
-      resourceType: "session",
-      resourceId: sessionId,
-      summary: "撤销本人会话",
-      ipAddress: await getRequestIpAddress(),
+      audit: await auditFor(session, {
+        action: "session.revoke",
+        resourceType: "session",
+        resourceId: sessionId,
+        summary: "撤销本人会话",
+      }),
     });
   } catch (error) {
     redirect(`/app/profile?notice=${noticeFor(error)}`);

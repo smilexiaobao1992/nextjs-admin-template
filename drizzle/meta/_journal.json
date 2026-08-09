@@ -15,6 +15,20 @@
       "when": 1785600000000,
       "tag": "0001_foundation_ops",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786249632360,
+      "tag": "0002_multi_user_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786252969901,
+      "tag": "0003_enforce_multi_role_references",
+      "breakpoints": true
     }
   ]
 }

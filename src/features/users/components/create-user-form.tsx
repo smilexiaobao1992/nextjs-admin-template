@@ -1,7 +1,6 @@
 import { UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createUserAction } from "@/features/users/actions";
 import type { Role } from "@/lib/db/schema";
@@ -26,39 +25,55 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
 
       <form
         action={createUserAction}
-        className="grid gap-4 lg:grid-cols-[1fr_1.2fr_1.2fr_auto_auto] lg:items-end"
+        className="space-y-5"
       >
-        <div className="space-y-2">
-          <Label htmlFor="name">姓名</Label>
-          <Input id="name" name="name" autoComplete="name" maxLength={100} required />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="name">姓名</Label>
+            <Input id="name" name="name" autoComplete="name" maxLength={100} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-email">邮箱</Label>
+            <Input id="new-email" name="email" type="email" autoComplete="off" spellCheck={false} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">初始密码</Label>
+            <Input
+              id="new-password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              pattern="(?=.*[A-Za-z])(?=.*\d).{12,}"
+              required
+            />
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="new-email">邮箱</Label>
-          <Input id="new-email" name="email" type="email" autoComplete="off" spellCheck={false} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="new-password">初始密码</Label>
-          <Input
-            id="new-password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={12}
-            pattern="(?=.*[A-Za-z])(?=.*\d).{12,}"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="new-role">角色</Label>
-          <Select id="new-role" name="role" defaultValue={defaultRole}>
+
+        <fieldset className="border-t border-border/70 pt-4">
+          <legend className="pr-3 text-sm font-medium">角色（可同时选择多个）</legend>
+          <div className="mt-3 flex flex-wrap gap-2">
             {roles.map((item) => (
-              <option key={item.id} value={item.key}>
-                {item.name}
-              </option>
+              <label
+                key={item.id}
+                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/80 px-3 py-2 text-sm transition-colors hover:bg-accent/45 has-checked:border-primary has-checked:bg-primary/8 has-checked:text-primary"
+              >
+                <input
+                  type="checkbox"
+                  name="roles"
+                  value={item.key}
+                  defaultChecked={item.key === defaultRole}
+                  className="size-4 shrink-0"
+                />
+                <span>{item.name}</span>
+              </label>
             ))}
-          </Select>
+          </div>
+        </fieldset>
+
+        <div className="flex justify-end">
+          <SubmitButton pendingLabel="创建中…">创建用户</SubmitButton>
         </div>
-        <SubmitButton pendingLabel="创建中…">创建用户</SubmitButton>
       </form>
     </section>
   );

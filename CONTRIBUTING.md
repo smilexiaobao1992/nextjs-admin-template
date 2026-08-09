@@ -31,12 +31,14 @@ npm run dev
 | `npm run db:generate` | 根据 schema 生成迁移 |
 | `npm run db:migrate` | 执行迁移 |
 | `npm run db:verify` | 校验种子与关键约束 |
+| `npm run db:verify:security` | 校验授权边界与审计事务原子性 |
 | `npm run scaffold:feature -- <name>` | 生成 feature 骨架 |
 
 提交前请至少通过：
 
 ```bash
 npm run check
+npm run db:verify:security
 npm run build
 ```
 
@@ -45,7 +47,7 @@ npm run build
 - 路由保持薄：`src/app/**/page.tsx` 只做权限校验与组装。
 - 业务放在 `src/features/<domain>/`。
 - 鉴权在 Server Action / 页面服务端使用 `requirePermission`；不要只靠隐藏菜单。
-- 关键写操作写入审计日志（`writeAuditLog`）。
+- 关键写操作与审计日志（`writeAuditLog`）必须在同一个数据库事务中提交。
 - UI 遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
 - 默认界面文案为简体中文；代码标识符与注释使用英文。
 - 不要提交 `.env`、密钥或真实生产数据。

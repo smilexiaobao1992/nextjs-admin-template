@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
 import { requirePermission } from "@/lib/auth/session";
+import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
 import {
   isSystemAdminRole,
@@ -15,6 +16,7 @@ import {
   listPermissionIdsByRole,
   roleHasPermission,
 } from "@/lib/rbac/permissions";
+import { parseRoleKeys } from "@/lib/rbac/role-keys";
 import { cn } from "@/lib/utils";
 
 export default async function RolesPage({
@@ -34,6 +36,21 @@ export default async function RolesPage({
   const selectedRole = roles.find((item) => item.id === selectedId) ?? roles[0] ?? null;
   const createMode = canWrite && mode === "create";
   const canManageSystemRoles = isSystemAdminRole(roleKey);
+  const actorRoleKeys = new Set(parseRoleKeys(roleKey));
+  const actorPermissionIds = roles
+    .filter((item) => actorRoleKeys.has(item.key))
+    .flatMap((item) => rolePermissions[item.id] ?? []);
+  const actorPermissionIdSet = new Set(actorPermissionIds);
+  const editablePermissions = canManageSystemRoles
+    ? permissions
+    : permissions.filter((item) => actorPermissionIdSet.has(item.id));
+  const canManageSelectedRole = canManageSystemRoles || (selectedRole
+    ? canManageRolePermissionSets({
+        actorPermissionIds,
+        currentPermissionIds: rolePermissions[selectedRole.id] ?? [],
+        nextPermissionIds: rolePermissions[selectedRole.id] ?? [],
+      })
+    : false);
 
   return (
     <div className="space-y-7">
@@ -127,7 +144,7 @@ export default async function RolesPage({
                     <Input id="role-description" name="description" maxLength={200} />
                   </div>
                 </div>
-                <PermissionMatrix permissions={permissions} selectedIds={new Set()} />
+                <PermissionMatrix permissions={editablePermissions} selectedIds={new Set()} />
                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
                   <label className="flex min-h-10 items-center gap-2 text-sm">
                     <input type="checkbox" name="isDefault" />
@@ -140,9 +157,9 @@ export default async function RolesPage({
           ) : selectedRole ? (
             <RoleDetail
               role={selectedRole}
-              permissions={permissions}
+              permissions={canManageSelectedRole ? editablePermissions : permissions}
               selectedIds={new Set(rolePermissions[selectedRole.id] ?? [])}
-              canEdit={canWrite && (!selectedRole.isSystem || canManageSystemRoles)}
+              canEdit={canWrite && canManageSelectedRole && (!selectedRole.isSystem || canManageSystemRoles)}
             />
           ) : (
             <div className="py-16 text-center">

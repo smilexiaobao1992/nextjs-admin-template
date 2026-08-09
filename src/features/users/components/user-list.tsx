@@ -1,7 +1,3 @@
-import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { SubmitButton } from "@/components/ui/submit-button";
 import {
   Table,
   TableBody,
@@ -10,14 +6,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  resetUserPasswordAction,
-  revokeUserSessionsAction,
-  setUserBannedAction,
-  setUserRoleAction,
-} from "@/features/users/actions";
 import type { ListedUser } from "@/features/users/queries";
 import type { Role } from "@/lib/db/schema";
+import { parseRoleKeys } from "@/lib/rbac/role-keys";
+import { UserManagementDialog } from "./user-management-dialog";
 
 export function UserList({
   users,
@@ -25,6 +17,7 @@ export function UserList({
   assignableRoles: allowedRoles,
   canWrite,
   canManageSystemRoles = false,
+  manageableUserIds,
   currentUserId,
   total,
 }: {
@@ -33,6 +26,7 @@ export function UserList({
   assignableRoles?: Role[];
   canWrite: boolean;
   canManageSystemRoles?: boolean;
+  manageableUserIds?: Set<string>;
   currentUserId?: string;
   total: number;
 }) {
@@ -73,8 +67,12 @@ export function UserList({
           <TableBody>
             {users.map((item) => {
               const isSelf = currentUserId === item.id;
+              const itemRoleKeys = parseRoleKeys(item.role);
+              const targetIsManageable = manageableUserIds
+                ? manageableUserIds.has(item.id)
+                : canManageSystemRoles || !itemRoleKeys.some((key) => systemRoleKeys.has(key));
               const canMutate =
-                canWrite && (canManageSystemRoles || !systemRoleKeys.has(item.role)) && !isSelf;
+                canWrite && targetIsManageable && !isSelf;
 
               return (
                 <TableRow key={item.id}>
@@ -84,28 +82,7 @@ export function UserList({
                     {isSelf ? <p className="mt-1 text-xs text-muted-foreground">当前登录账号</p> : null}
                   </TableCell>
                   <TableCell>
-                    {canMutate ? (
-                      <form action={setUserRoleAction} className="flex flex-wrap items-center gap-2">
-                        <input type="hidden" name="userId" value={item.id} />
-                        <Select
-                          name="role"
-                          defaultValue={item.role}
-                          aria-label={`调整 ${item.email} 的角色`}
-                          className="w-auto min-w-28"
-                        >
-                          {assignableRoles.map((role) => (
-                            <option key={role.id} value={role.key}>
-                              {role.name}
-                            </option>
-                          ))}
-                        </Select>
-                        <SubmitButton variant="outline" size="sm" pendingLabel="保存中…">
-                          保存角色
-                        </SubmitButton>
-                      </form>
-                    ) : (
-                      <span>{roleNameByKey[item.role] ?? item.role}</span>
-                    )}
+                    <span>{itemRoleKeys.map((key) => roleNameByKey[key] ?? key).join("、")}</span>
                   </TableCell>
                   <TableCell>
                     {item.banned ? (
@@ -128,73 +105,23 @@ export function UserList({
                   </TableCell>
                   <TableCell className="text-right">
                     {canMutate ? (
-                      <div className="flex flex-col items-end gap-2">
-                        <form action={setUserBannedAction} className="flex flex-wrap items-center justify-end gap-2">
-                          <input type="hidden" name="userId" value={item.id} />
-                          <input type="hidden" name="banned" value={item.banned ? "false" : "true"} />
-                          {!item.banned ? (
-                            <Input
-                              name="banReason"
-                              placeholder="封禁原因（可选）"
-                              maxLength={200}
-                              className="h-9 w-36 text-xs"
-                              aria-label={`封禁 ${item.email} 的原因`}
-                            />
-                          ) : null}
-                          <ConfirmSubmitButton
-                            variant={item.banned ? "outline" : "destructive"}
-                            size="sm"
-                            confirmMessage={
-                              item.banned
-                                ? `确认解封 ${item.email}？`
-                                : `确认封禁 ${item.email}？封禁后其全部会话将立即失效。`
-                            }
-                            confirmLabel={item.banned ? "确认解封" : "确认封禁"}
-                            pendingLabel="处理中…"
-                          >
-                            {item.banned ? "解封" : "封禁"}
-                          </ConfirmSubmitButton>
-                        </form>
-
-                        <form action={resetUserPasswordAction} className="flex flex-wrap items-center justify-end gap-2">
-                          <input type="hidden" name="userId" value={item.id} />
-                          <Input
-                            name="password"
-                            type="password"
-                            autoComplete="new-password"
-                            placeholder="新密码"
-                            minLength={12}
-                            pattern="(?=.*[A-Za-z])(?=.*\d).{12,}"
-                            required
-                            className="h-9 w-36 text-xs"
-                            aria-label={`重置 ${item.email} 的密码`}
-                          />
-                          <ConfirmSubmitButton
-                            variant="outline"
-                            size="sm"
-                            confirmMessage={`确认重置 ${item.email} 的密码？对方需使用新密码重新登录。`}
-                            confirmLabel="确认重置"
-                            pendingLabel="重置中…"
-                          >
-                            重置密码
-                          </ConfirmSubmitButton>
-                        </form>
-
-                        <form action={revokeUserSessionsAction}>
-                          <input type="hidden" name="userId" value={item.id} />
-                          <ConfirmSubmitButton
-                            variant="ghost"
-                            size="sm"
-                            confirmMessage={`确认撤销 ${item.email} 的全部登录会话？`}
-                            confirmLabel="确认撤销"
-                            pendingLabel="撤销中…"
-                          >
-                            撤销会话
-                          </ConfirmSubmitButton>
-                        </form>
-                      </div>
+                      <UserManagementDialog
+                        user={{
+                          id: item.id,
+                          name: item.name,
+                          email: item.email,
+                          role: item.role,
+                          banned: item.banned,
+                          banReason: item.banReason,
+                        }}
+                        roles={assignableRoles.map((role) => ({
+                          id: role.id,
+                          key: role.key,
+                          name: role.name,
+                        }))}
+                      />
                     ) : (
-                      <span className="text-xs text-muted-foreground">只读</span>
+                      <span className="text-xs text-muted-foreground">{isSelf ? "当前账号" : "只读"}</span>
                     )}
                   </TableCell>
                 </TableRow>

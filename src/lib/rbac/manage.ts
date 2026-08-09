@@ -1,7 +1,10 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { menu, permission, role, rolePermission, user } from "@/lib/db/schema";
+import { canManageRolePermissionSets } from "@/lib/auth/authorization";
+import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
 import { SYSTEM_ADMIN_ROLE_KEY } from "./constants";
+import { hasSystemAdminRole, parseRoleKeys } from "./role-keys";
 import {
   canBeDefaultRole,
   isSafeInternalHref,
@@ -17,6 +20,7 @@ export class RbacError extends Error {
       | "not_found"
       | "duplicate"
       | "system_locked"
+      | "role_scope_forbidden"
       | "in_use"
       | "last_default",
   ) {
@@ -28,9 +32,44 @@ function normalizeText(value: string, max = 100) {
   return value.trim().slice(0, max);
 }
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function assertRolePermissionScope(
+  tx: Transaction,
+  actorRoleKey: string,
+  currentPermissionIds: string[],
+  nextPermissionIds: string[],
+) {
+  if (hasSystemAdminRole(actorRoleKey)) {
+    return;
+  }
+
+  const actorRoleKeys = parseRoleKeys(actorRoleKey);
+  const actorRoles = actorRoleKeys.length > 0
+    ? await tx.select({ id: role.id }).from(role).where(inArray(role.key, actorRoleKeys))
+    : [];
+  if (actorRoles.length !== actorRoleKeys.length) {
+    throw new RbacError("role_scope_forbidden");
+  }
+  const actorPermissions = await tx
+    .select({ id: rolePermission.permissionId })
+    .from(rolePermission)
+    .where(inArray(rolePermission.roleId, actorRoles.map((item) => item.id)));
+  if (!canManageRolePermissionSets({
+    actorPermissionIds: actorPermissions.map((item) => item.id),
+    currentPermissionIds,
+    nextPermissionIds,
+  })) {
+    throw new RbacError("role_scope_forbidden");
+  }
+}
+
 // --- Permissions ---
 
-export async function createPermission(input: { key: string; name: string; description?: string }) {
+export async function createPermission(
+  input: { key: string; name: string; description?: string },
+  audit: WriteAuditLogInput,
+) {
   const key = input.key.trim().toLowerCase();
   const name = normalizeText(input.name);
   const description = input.description?.trim() || null;
@@ -47,6 +86,7 @@ export async function createPermission(input: { key: string; name: string; descr
 
     const id = crypto.randomUUID();
     await tx.insert(permission).values({ id, key, name, description, isSystem: false });
+    await writeAuditLog({ ...audit, resourceId: id }, tx);
 
     return id;
   });
@@ -56,7 +96,7 @@ export async function updatePermission(input: {
   id: string;
   name: string;
   description?: string;
-}) {
+}, audit: WriteAuditLogInput) {
   const name = normalizeText(input.name);
   const description = input.description?.trim() || null;
 
@@ -64,18 +104,21 @@ export async function updatePermission(input: {
     throw new RbacError("invalid_input");
   }
 
-  const [existing] = await db.select().from(permission).where(eq(permission.id, input.id)).limit(1);
-  if (!existing) {
-    throw new RbacError("not_found");
-  }
+  return db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(permission).where(eq(permission.id, input.id)).limit(1);
+    if (!existing) {
+      throw new RbacError("not_found");
+    }
 
-  await db
-    .update(permission)
-    .set({ name, description, updatedAt: new Date() })
-    .where(eq(permission.id, input.id));
+    await tx
+      .update(permission)
+      .set({ name, description, updatedAt: new Date() })
+      .where(eq(permission.id, input.id));
+    await writeAuditLog(audit, tx);
+  });
 }
 
-export async function deletePermission(id: string) {
+export async function deletePermission(id: string, audit: WriteAuditLogInput) {
   return db.transaction(async (tx) => {
     const [existing] = await tx.select().from(permission).where(eq(permission.id, id)).limit(1);
     if (!existing) {
@@ -112,6 +155,7 @@ export async function deletePermission(id: string) {
         .where(and(eq(rolePermission.permissionId, id), eq(rolePermission.roleId, adminRole.id)));
     }
     await tx.delete(permission).where(eq(permission.id, id));
+    await writeAuditLog(audit, tx);
   });
 }
 
@@ -123,7 +167,7 @@ export async function createRole(input: {
   description?: string;
   permissionIds: string[];
   isDefault?: boolean;
-}) {
+}, actorRoleKey: string, audit: WriteAuditLogInput) {
   const key = input.key.trim().toLowerCase();
   const name = normalizeText(input.name);
   const description = input.description?.trim() || null;
@@ -144,6 +188,8 @@ export async function createRole(input: {
     }
 
     const id = crypto.randomUUID();
+    const uniquePermissionIds = [...new Set(input.permissionIds.filter(Boolean))];
+    await assertRolePermissionScope(tx, actorRoleKey, [], uniquePermissionIds);
     await tx.insert(role).values({
       id,
       key,
@@ -153,12 +199,12 @@ export async function createRole(input: {
       isDefault: Boolean(input.isDefault),
     });
 
-    const uniquePermissionIds = [...new Set(input.permissionIds.filter(Boolean))];
     if (uniquePermissionIds.length > 0) {
       await tx.insert(rolePermission).values(
         uniquePermissionIds.map((permissionId) => ({ roleId: id, permissionId })),
       );
     }
+    await writeAuditLog({ ...audit, resourceId: id }, tx);
 
     return id;
   });
@@ -170,7 +216,7 @@ export async function updateRole(input: {
   description?: string;
   permissionIds: string[];
   isDefault?: boolean;
-}, actorRoleKey: string) {
+}, actorRoleKey: string, audit: WriteAuditLogInput) {
   const name = normalizeText(input.name);
   const description = input.description?.trim() || null;
 
@@ -185,7 +231,7 @@ export async function updateRole(input: {
       throw new RbacError("not_found");
     }
 
-    if (existing.isSystem && actorRoleKey !== SYSTEM_ADMIN_ROLE_KEY) {
+    if (existing.isSystem && !hasSystemAdminRole(actorRoleKey)) {
       throw new RbacError("system_locked");
     }
     if (input.isDefault && !canBeDefaultRole({ isSystem: existing.isSystem })) {
@@ -217,22 +263,39 @@ export async function updateRole(input: {
     // The system admin is authorized by role key and receives new permissions automatically.
     // Ignore its submitted checkbox list so the stored bindings cannot be accidentally narrowed.
     if (existing.key === SYSTEM_ADMIN_ROLE_KEY) {
+      await writeAuditLog(audit, tx);
       return;
     }
 
-    await tx.delete(rolePermission).where(eq(rolePermission.roleId, input.id));
+    const currentPermissions = await tx
+      .select({ id: rolePermission.permissionId })
+      .from(rolePermission)
+      .where(eq(rolePermission.roleId, input.id));
     const uniquePermissionIds = [...new Set(input.permissionIds.filter(Boolean))];
+    await assertRolePermissionScope(
+      tx,
+      actorRoleKey,
+      currentPermissions.map((item) => item.id),
+      uniquePermissionIds,
+    );
+    await tx.delete(rolePermission).where(eq(rolePermission.roleId, input.id));
     if (uniquePermissionIds.length > 0) {
       await tx.insert(rolePermission).values(
         uniquePermissionIds.map((permissionId) => ({ roleId: input.id, permissionId })),
       );
     }
+    await writeAuditLog(audit, tx);
   });
 }
 
-export async function deleteRole(id: string) {
+export async function deleteRole(id: string, actorRoleKey: string, audit: WriteAuditLogInput) {
   return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(role).where(eq(role.id, id)).limit(1);
+    const [existing] = await tx
+      .select()
+      .from(role)
+      .where(eq(role.id, id))
+      .limit(1)
+      .for("update");
     if (!existing) {
       throw new RbacError("not_found");
     }
@@ -240,7 +303,11 @@ export async function deleteRole(id: string) {
       throw new RbacError("system_locked");
     }
 
-    const users = await tx.select({ id: user.id }).from(user).where(eq(user.role, existing.key)).limit(1);
+    const users = await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(sql`${existing.key} = any(string_to_array(${user.role}, ','))`)
+      .limit(1);
     if (users.length > 0) {
       throw new RbacError("in_use");
     }
@@ -249,7 +316,19 @@ export async function deleteRole(id: string) {
       throw new RbacError("last_default");
     }
 
+    const currentPermissions = await tx
+      .select({ id: rolePermission.permissionId })
+      .from(rolePermission)
+      .where(eq(rolePermission.roleId, id));
+    await assertRolePermissionScope(
+      tx,
+      actorRoleKey,
+      currentPermissions.map((item) => item.id),
+      [],
+    );
+
     await tx.delete(role).where(eq(role.id, id));
+    await writeAuditLog(audit, tx);
   });
 }
 
@@ -263,7 +342,7 @@ export async function createMenu(input: {
   parentId?: string | null;
   permissionId?: string | null;
   isVisible?: boolean;
-}) {
+}, audit: WriteAuditLogInput) {
   const title = normalizeText(input.title, 80);
   const href = input.href.trim();
   const icon = input.icon?.trim() || null;
@@ -308,6 +387,7 @@ export async function createMenu(input: {
       permissionId: input.permissionId || null,
       isVisible: input.isVisible !== false,
     });
+    await writeAuditLog({ ...audit, resourceId: id }, tx);
     return id;
   });
 }
@@ -321,7 +401,7 @@ export async function updateMenu(input: {
   parentId?: string | null;
   permissionId?: string | null;
   isVisible?: boolean;
-}) {
+}, audit: WriteAuditLogInput) {
   const title = normalizeText(input.title, 80);
   const href = input.href.trim();
   const icon = input.icon?.trim() || null;
@@ -382,10 +462,11 @@ export async function updateMenu(input: {
         updatedAt: new Date(),
       })
       .where(eq(menu.id, input.id));
+    await writeAuditLog(audit, tx);
   });
 }
 
-export async function deleteMenu(id: string) {
+export async function deleteMenu(id: string, audit: WriteAuditLogInput) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`lock table menu in share row exclusive mode`);
 
@@ -400,5 +481,6 @@ export async function deleteMenu(id: string) {
     }
 
     await tx.delete(menu).where(eq(menu.id, id));
+    await writeAuditLog(audit, tx);
   });
 }

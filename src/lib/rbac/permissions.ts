@@ -1,21 +1,30 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { menu, permission, role, rolePermission } from "@/lib/db/schema";
-import { SYSTEM_ADMIN_ROLE_KEY } from "./constants";
+import { hasSystemAdminRole, parseRoleKeys } from "./role-keys";
 
 export function isSystemAdminRole(roleKey: string | null | undefined): boolean {
-  return roleKey === SYSTEM_ADMIN_ROLE_KEY;
+  return hasSystemAdminRole(roleKey);
 }
 
-export async function getRoleByKey(roleKey: string) {
-  const [row] = await db.select().from(role).where(eq(role.key, roleKey)).limit(1);
-  return row ?? null;
+export async function listRolesForRoleValue(roleValue: string) {
+  const roleKeys = parseRoleKeys(roleValue);
+  if (roleKeys.length === 0) {
+    return [];
+  }
+  return db.select().from(role).where(inArray(role.key, roleKeys)).orderBy(asc(role.name));
 }
 
-export async function listPermissionKeysForRoleKey(roleKey: string): Promise<Set<string>> {
+export const listPermissionKeysForRoleKey = cache(async function listPermissionKeysForRoleKey(roleKey: string): Promise<Set<string>> {
   if (isSystemAdminRole(roleKey)) {
     const all = await db.select({ key: permission.key }).from(permission);
     return new Set(all.map((item) => item.key));
+  }
+
+  const roleKeys = parseRoleKeys(roleKey);
+  if (roleKeys.length === 0) {
+    return new Set();
   }
 
   const rows = await db
@@ -23,10 +32,10 @@ export async function listPermissionKeysForRoleKey(roleKey: string): Promise<Set
     .from(role)
     .innerJoin(rolePermission, eq(rolePermission.roleId, role.id))
     .innerJoin(permission, eq(permission.id, rolePermission.permissionId))
-    .where(eq(role.key, roleKey));
+    .where(inArray(role.key, roleKeys));
 
   return new Set(rows.map((item) => item.key));
-}
+});
 
 export async function roleHasPermission(roleKey: string, permissionKey: string): Promise<boolean> {
   if (isSystemAdminRole(roleKey)) {

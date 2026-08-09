@@ -6,9 +6,9 @@
   "license": "MIT",
   "packageManager": "npm@10.9.2",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3002",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3002",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -16,13 +16,14 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:verify": "tsx scripts/verify-rbac-database.ts",
+    "db:verify": "node --env-file-if-exists=.env.local --import tsx scripts/verify-rbac-database.ts",
+    "db:verify:security": "node --env-file-if-exists=.env.local --import tsx scripts/verify-security-boundaries.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "admin:create": "tsx scripts/create-admin.ts",
+    "admin:create": "node --env-file-if-exists=.env.local --import tsx scripts/create-admin.ts",
     "scaffold:feature": "tsx scripts/scaffold-feature.ts",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down"
+    "db:up": "docker compose --env-file .env.local up -d",
+    "db:down": "docker compose --env-file .env.local down"
   },
   "engines": {
     "node": "24.x"
@@ -32,16 +33,17 @@
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-slot": "^1.2.4",
-    "better-auth": "^1.6.23",
+    "better-auth": "1.6.23",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "geist": "^1.7.2",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.562.0",
-    "next": "16.2.10",
+    "next": "16.3.0",
     "postgres": "^3.4.8",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
@@ -50,16 +52,26 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^20",
+    "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.0",
     "jsdom": "^27.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "drizzle-kit": {
+      "esbuild": "0.28.2",
+      "@esbuild-kit/esm-loader": {
+        "@esbuild-kit/core-utils": {
+          "esbuild": "0.28.2"
+        }
+      }
+    }
   }
 }

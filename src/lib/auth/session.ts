@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { buildLoginHref } from "./authorization";
 import { isSystemAdminRole, roleHasPermission } from "@/lib/rbac/permissions";
@@ -9,9 +10,9 @@ export async function getRequestPathname(): Promise<string> {
   return headerStore.get("x-pathname") ?? "/app";
 }
 
-export async function getSession() {
+export const getSession = cache(async function getSession() {
   return auth.api.getSession({ headers: await headers() });
-}
+});
 
 export async function requireSession() {
   const session = await getSession();
@@ -28,7 +29,7 @@ export async function requireAdminSession() {
   const session = await requireSession();
 
   if (!isSystemAdminRole(session.user.role)) {
-    redirect("/app?notice=forbidden");
+    redirect("/app/profile?notice=forbidden");
   }
 
   return session;
@@ -44,7 +45,7 @@ export async function requirePermission(permissionKey: string) {
 
   const allowed = await roleHasPermission(roleKey, permissionKey);
   if (!allowed) {
-    redirect("/app?notice=forbidden");
+    redirect("/app/profile?notice=forbidden");
   }
 
   return session;

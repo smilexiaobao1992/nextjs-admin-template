@@ -1,42 +1,46 @@
 import Link from "next/link";
 import { Activity, ShieldCheck, Users, UserRoundCog } from "lucide-react";
-import { countRecentAuditLogs } from "@/lib/audit/queries";
-import { requireSession } from "@/lib/auth/session";
-import {
-  countActiveSessions,
-  countBannedUsers,
-  countRoles,
-  countUsers,
-  listRecentUsers,
-} from "@/features/users/queries";
-import { listAllRoles } from "@/lib/rbac/permissions";
+import { requirePermission } from "@/lib/auth/session";
+import { getDashboardStats } from "@/features/dashboard/queries";
+import { listRecentUsers } from "@/features/users/queries";
+import { isSystemAdminRole, listAllRoles, listPermissionKeysForRoleKey } from "@/lib/rbac/permissions";
+import { parseRoleKeys } from "@/lib/rbac/role-keys";
 
-export default async function AppPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  // Any authenticated user can open /app (forbidden redirects land here).
-  // Stats still reflect real aggregates; menu visibility remains permission-filtered.
-  await requireSession();
-  const { notice } = await searchParams;
+export default async function AppPage() {
+  const session = await requirePermission("dashboard:view");
+  const roleKey = session.user.role ?? "";
+  const permissionKeys = await listPermissionKeysForRoleKey(roleKey);
+  const isAdmin = isSystemAdminRole(roleKey);
+  const canReadUsers = isAdmin || permissionKeys.has("users:read");
+  const canReadRoles = isAdmin || permissionKeys.has("roles:read");
+  const canReadAudit = isAdmin || permissionKeys.has("audit:read");
 
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 7);
-  const [userCount, bannedCount, roleCount, sessionCount, recentAuditCount, recentUsers, roles] =
-    await Promise.all([
-      countUsers(),
-      countBannedUsers(),
-      countRoles(),
-      countActiveSessions(),
-      countRecentAuditLogs(since),
-      listRecentUsers(5),
-      listAllRoles(),
-    ]);
+  const [summary, recentUsers, roles] = await Promise.all([
+    getDashboardStats({
+      includeUsers: canReadUsers,
+      includeRoles: canReadRoles,
+      includeAudit: canReadAudit,
+      auditSince: since,
+    }),
+    canReadUsers ? listRecentUsers(5) : Promise.resolve([]),
+    canReadUsers ? listAllRoles() : Promise.resolve([]),
+  ]);
 
   const roleNameByKey = Object.fromEntries(roles.map((item) => [item.key, item.name]));
 
   const stats = [
-    { label: "用户总数", value: userCount, detail: bannedCount > 0 ? `其中 ${bannedCount} 个已封禁` : "全部正常", href: "/app/users" },
-    { label: "角色数", value: roleCount, detail: "含系统与自定义角色", href: "/app/roles" },
-    { label: "活跃会话", value: sessionCount, detail: "未过期的登录会话", href: "/app/profile" },
-    { label: "近 7 日审计", value: recentAuditCount, detail: "关键写操作记录", href: "/app/audit" },
+    ...(canReadUsers ? [
+      { label: "用户总数", value: summary.userCount, detail: Number(summary.bannedCount) > 0 ? `其中 ${summary.bannedCount} 个已封禁` : "全部正常", href: "/app/users" },
+      { label: "活跃会话", value: summary.sessionCount, detail: "未过期的登录会话", href: "/app/users" },
+    ] : []),
+    ...(canReadRoles ? [
+      { label: "角色数", value: summary.roleCount, detail: "含系统与自定义角色", href: "/app/roles" },
+    ] : []),
+    ...(canReadAudit ? [
+      { label: "近 7 日审计", value: summary.recentAuditCount, detail: "关键写操作记录", href: "/app/audit" },
+    ] : []),
   ];
 
   return (
@@ -49,13 +53,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         </p>
       </div>
 
-      {notice === "forbidden" ? (
-        <p role="alert" className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          当前账号没有访问该页面的权限。
-        </p>
-      ) : null}
-
-      <section aria-labelledby="workspace-stats-title">
+      {stats.length > 0 ? <section aria-labelledby="workspace-stats-title">
         <h2 id="workspace-stats-title" className="text-lg font-semibold tracking-[-0.012em]">
           环境概览
         </h2>
@@ -72,10 +70,10 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
             </Link>
           ))}
         </div>
-      </section>
+      </section> : null}
 
-      <section aria-labelledby="recent-users-title" className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+      <div className="grid gap-5 lg:grid-cols-2">
+        {canReadUsers ? <div className="rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
           <div className="border-b border-border/70 px-5 py-4">
             <h2 id="recent-users-title" className="font-semibold">
               最近创建的账号
@@ -93,7 +91,9 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
                     <p className="truncate text-xs text-muted-foreground">{item.email}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-sm">{roleNameByKey[item.role] ?? item.role}</p>
+                    <p className="text-sm">
+                      {parseRoleKeys(item.role).map((key) => roleNameByKey[key] ?? key).join("、")}
+                    </p>
                     <p className="text-xs tabular-nums text-muted-foreground">
                       {item.createdAt.toLocaleDateString("zh-CN")}
                       {item.banned ? " · 已封禁" : ""}
@@ -103,7 +103,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
               ))}
             </ul>
           )}
-        </div>
+        </div> : null}
 
         <section aria-labelledby="workspace-guide-title">
           <h2 id="workspace-guide-title" className="text-lg font-semibold tracking-[-0.012em]">
@@ -128,7 +128,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
             ))}
           </div>
         </section>
-      </section>
+      </div>
     </div>
   );
 }

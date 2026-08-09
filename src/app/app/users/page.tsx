@@ -14,6 +14,7 @@ import {
   listPermissionIdsByRole,
   roleHasPermission,
 } from "@/lib/rbac/permissions";
+import { parseRoleKeys } from "@/lib/rbac/role-keys";
 
 export default async function UsersPage({
   searchParams,
@@ -31,8 +32,10 @@ export default async function UsersPage({
   const roleKey = session.user.role ?? "";
   const canWrite = await roleHasPermission(roleKey, "users:write");
   const canManageSystemRoles = isSystemAdminRole(roleKey);
-  const actorRole = roles.find((item) => item.key === roleKey);
-  const actorPermissionIds = actorRole ? permissionIdsByRole[actorRole.id] ?? [] : [];
+  const actorRoleKeys = new Set(parseRoleKeys(roleKey));
+  const actorPermissionIds = roles
+    .filter((item) => actorRoleKeys.has(item.key))
+    .flatMap((item) => permissionIdsByRole[item.id] ?? []);
   const assignableRoles = canManageSystemRoles
     ? roles
     : roles.filter((item) =>
@@ -41,6 +44,30 @@ export default async function UsersPage({
           nextPermissionIds: permissionIdsByRole[item.id] ?? [],
         }),
       );
+  const manageableUserIds = new Set(
+    usersPage.items
+      .filter((item) => {
+        if (canManageSystemRoles) {
+          return true;
+        }
+
+        const targetRoleKeys = new Set(parseRoleKeys(item.role));
+        const targetRoles = roles.filter((role) => targetRoleKeys.has(role.key));
+        if (targetRoles.length !== targetRoleKeys.size || targetRoles.some((role) => role.isSystem)) {
+          return false;
+        }
+
+        const targetPermissionIds = targetRoles.flatMap(
+          (role) => permissionIdsByRole[role.id] ?? [],
+        );
+        return canManageRolePermissionSets({
+          actorPermissionIds,
+          currentPermissionIds: targetPermissionIds,
+          nextPermissionIds: targetPermissionIds,
+        });
+      })
+      .map((item) => item.id),
+  );
 
   return (
     <div className="space-y-7">
@@ -72,6 +99,7 @@ export default async function UsersPage({
           assignableRoles={assignableRoles}
           canWrite={canWrite}
           canManageSystemRoles={canManageSystemRoles}
+          manageableUserIds={manageableUserIds}
           currentUserId={session.user.id}
           total={usersPage.total}
         />

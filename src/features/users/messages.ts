@@ -22,6 +22,7 @@ export const userNoticeMessages: Record<string, string> = {
 };
 
 export const profileNoticeMessages: Record<string, string> = {
+  forbidden: "当前账号没有访问该页面的权限。",
   password_changed: userNoticeMessages.password_changed,
   password_mismatch: userNoticeMessages.password_mismatch,
   session_revoked: userNoticeMessages.session_revoked,

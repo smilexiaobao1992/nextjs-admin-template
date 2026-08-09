@@ -15,7 +15,7 @@ import { changeOwnPasswordAction, revokeOwnSessionAction } from "@/features/user
 import { profileNoticeMessages } from "@/features/users/messages";
 import { listSessionsForUser } from "@/lib/auth/user-management";
 import { requireSession } from "@/lib/auth/session";
-import { getRoleByKey } from "@/lib/rbac/permissions";
+import { listRolesForRoleValue } from "@/lib/rbac/permissions";
 
 export default async function ProfilePage({
   searchParams,
@@ -24,9 +24,9 @@ export default async function ProfilePage({
 }) {
   const session = await requireSession();
   const { notice } = await searchParams;
-  const [sessions, roleRow] = await Promise.all([
+  const [sessions, roleRows] = await Promise.all([
     listSessionsForUser(session.user.id),
-    getRoleByKey(session.user.role ?? ""),
+    listRolesForRoleValue(session.user.role ?? ""),
   ]);
 
   return (
@@ -57,7 +57,9 @@ export default async function ProfilePage({
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">角色</dt>
-            <dd className="mt-1 font-medium">{roleRow?.name ?? session.user.role}</dd>
+            <dd className="mt-1 font-medium">
+              {roleRows.map((item) => item.name).join("、") || session.user.role}
+            </dd>
           </div>
         </dl>
       </section>

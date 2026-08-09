@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { adminRole, userRole } from "@/lib/auth/access";
 import { validateBetterAuthSecret, validateBetterAuthUrl } from "@/lib/auth/env";
+import { DEFAULT_MEMBER_ROLE_KEY } from "@/lib/rbac/constants";
 
 function trustedOrigins(): string[] | undefined {
   const value = process.env.BETTER_AUTH_TRUSTED_ORIGINS;
@@ -40,9 +41,10 @@ export const auth = betterAuth({
   plugins: [
     admin({
       ac: defaultAc as AccessControl,
+      defaultRole: DEFAULT_MEMBER_ROLE_KEY,
       roles: {
         admin: adminRole,
-        user: userRole,
+        [DEFAULT_MEMBER_ROLE_KEY]: userRole,
       },
     }),
     nextCookies(),

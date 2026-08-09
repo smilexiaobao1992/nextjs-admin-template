@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginForm from "./login-form";
@@ -31,8 +31,8 @@ describe("login page", () => {
   it("exposes accessible credential fields without a public registration link", () => {
     render(<LoginForm nextPath="/app/users" />);
 
-    expect(screen.getByLabelText("邮箱")).toHaveAttribute("name", "email");
-    expect(screen.getByLabelText("邮箱")).toHaveAttribute("autocomplete", "email");
+    expect(screen.getByLabelText("工作邮箱")).toHaveAttribute("name", "email");
+    expect(screen.getByLabelText("工作邮箱")).toHaveAttribute("autocomplete", "email");
     expect(screen.getByLabelText("密码")).toHaveAttribute("autocomplete", "current-password");
     expect(screen.queryByRole("link", { name: /注册/ })).not.toBeInTheDocument();
   });
@@ -41,9 +41,9 @@ describe("login page", () => {
     const user = userEvent.setup();
     render(<LoginForm nextPath="/app/users" />);
 
-    await user.type(screen.getByLabelText("邮箱"), "admin@example.com");
-    await user.type(screen.getByLabelText("密码"), "admin-template-2026");
-    await user.click(screen.getByRole("button", { name: "登录" }));
+    fireEvent.change(screen.getByLabelText("工作邮箱"), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin-template-2026" } });
+    await user.click(screen.getByRole("button", { name: "安全登录" }));
 
     expect(signIn).toHaveBeenCalledWith({
       email: "admin@example.com",
@@ -58,9 +58,9 @@ describe("login page", () => {
     const user = userEvent.setup();
     render(<LoginForm nextPath="/app/users" />);
 
-    await user.type(screen.getByLabelText("邮箱"), "admin@example.com");
-    await user.type(screen.getByLabelText("密码"), "wrong-password-1");
-    await user.click(screen.getByRole("button", { name: "登录" }));
+    fireEvent.change(screen.getByLabelText("工作邮箱"), { target: { value: "admin@example.com" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "wrong-password-1" } });
+    await user.click(screen.getByRole("button", { name: "安全登录" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("邮箱或密码不正确");
     expect(screen.queryByText("internal detail")).not.toBeInTheDocument();

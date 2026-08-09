@@ -1,4 +1,4 @@
-import { SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
+import { hasSystemAdminRole } from "@/lib/rbac/role-keys";
 
 type SessionLike = {
   user?: {
@@ -7,7 +7,7 @@ type SessionLike = {
 } | null;
 
 export function isAdminSession(session: SessionLike): boolean {
-  return session?.user?.role === SYSTEM_ADMIN_ROLE_KEY;
+  return hasSystemAdminRole(session?.user?.role);
 }
 
 export function validateCredentialPassword(password: string): boolean {
@@ -52,7 +52,7 @@ export function canChangeRole({
   nextRole: string;
   adminCount: number;
 }): boolean {
-  return !(currentRole === SYSTEM_ADMIN_ROLE_KEY && nextRole !== SYSTEM_ADMIN_ROLE_KEY && adminCount <= 1);
+  return !(hasSystemAdminRole(currentRole) && !hasSystemAdminRole(nextRole) && adminCount <= 1);
 }
 
 export function canManageSystemRole({
@@ -68,7 +68,7 @@ export function canManageSystemRole({
     return true;
   }
 
-  return actorRole === SYSTEM_ADMIN_ROLE_KEY;
+  return hasSystemAdminRole(actorRole);
 }
 
 export function canManageRolePermissionSets({

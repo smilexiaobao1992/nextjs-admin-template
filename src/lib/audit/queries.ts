@@ -1,4 +1,4 @@
-import { count, desc, eq, gte, ilike, or, type SQL } from "drizzle-orm";
+import { count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/db/schema";
 import { clampPage, escapeLikePattern, type ParsedListQuery } from "@/lib/list/pagination";
@@ -41,15 +41,6 @@ export async function listAuditLogsPage(query: ParsedListQuery) {
 
 export async function countAuditLogs() {
   const [row] = await db.select({ value: count() }).from(auditLog);
-  return Number(row?.value ?? 0);
-}
-
-export async function countRecentAuditLogs(since: Date) {
-  // Use gte() so Date is bound as a timestamp, not Date#toString().
-  const [row] = await db
-    .select({ value: count() })
-    .from(auditLog)
-    .where(gte(auditLog.createdAt, since));
   return Number(row?.value ?? 0);
 }
 

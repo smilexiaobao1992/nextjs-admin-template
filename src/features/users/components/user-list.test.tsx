@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UserList } from "./user-list";
 
 vi.mock("@/features/users/actions", () => ({
-  setUserRoleAction: vi.fn(),
+  setUserRolesAction: vi.fn(),
   setUserBannedAction: vi.fn(),
   resetUserPasswordAction: vi.fn(),
   revokeUserSessionsAction: vi.fn(),
@@ -51,11 +52,11 @@ describe("UserList", () => {
     render(<UserList users={[user]} roles={roles} canWrite={false} total={1} />);
 
     expect(screen.getByText("普通成员")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "保存角色" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "管理 readonly@example.com" })).not.toBeInTheDocument();
   });
 
-  it("shows only roles the server marked assignable", () => {
+  it("shows only roles the server marked assignable inside the management dialog", async () => {
+    const interaction = userEvent.setup();
     render(
       <UserList
         users={[user]}
@@ -66,8 +67,11 @@ describe("UserList", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: "普通成员", hidden: true })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "高级运营", hidden: true })).not.toBeInTheDocument();
+    await interaction.click(screen.getByRole("button", { name: "管理 readonly@example.com" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "普通成员" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "高级运营" })).not.toBeInTheDocument();
   });
 
   it("hides mutation controls for the current user row", () => {
@@ -82,6 +86,50 @@ describe("UserList", () => {
     );
 
     expect(screen.getByText("当前登录账号")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "封禁" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "管理 readonly@example.com" })).not.toBeInTheDocument();
+  });
+
+  it("shows out-of-scope target users as read-only", () => {
+    render(
+      <UserList
+        users={[user]}
+        roles={roles}
+        canWrite
+        manageableUserIds={new Set()}
+        total={1}
+      />,
+    );
+
+    expect(screen.getByText("只读")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "管理 readonly@example.com" })).not.toBeInTheDocument();
+  });
+
+  it("renders and preselects all assigned roles", async () => {
+    const interaction = userEvent.setup();
+    render(
+      <UserList
+        users={[{ ...user, role: "member,ops" }]}
+        roles={roles}
+        canWrite
+        total={1}
+      />,
+    );
+
+    expect(screen.getByText("普通成员、高级运营")).toBeInTheDocument();
+    await interaction.click(screen.getByRole("button", { name: "管理 readonly@example.com" }));
+    expect(screen.getByRole("checkbox", { name: "普通成员" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "高级运营" })).toBeChecked();
+  });
+
+  it("keeps multiple role checkboxes selected at the same time", async () => {
+    const interaction = userEvent.setup();
+    render(<UserList users={[user]} roles={roles} canWrite total={1} />);
+
+    await interaction.click(screen.getByRole("button", { name: "管理 readonly@example.com" }));
+    await interaction.click(screen.getByRole("checkbox", { name: "高级运营" }));
+
+    expect(screen.getByRole("checkbox", { name: "普通成员" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "高级运营" })).toBeChecked();
+    expect(screen.getByText("已选择 2 个角色")).toBeInTheDocument();
   });
 });
