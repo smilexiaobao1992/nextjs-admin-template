@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { actorFromSession, getRequestIpAddress, type WriteAuditLogInput } from "@/lib/audit/log";
+import { auditFor } from "@/lib/audit/log";
 import { requirePermission, requireSession } from "@/lib/auth/session";
 import {
   changeOwnPassword,
@@ -28,17 +28,6 @@ function revalidateUserSurfaces() {
   revalidatePath("/app/users");
   revalidatePath("/app/profile");
   revalidatePath("/app/audit");
-}
-
-async function auditFor(
-  session: { user: { id: string; email: string } },
-  input: Omit<WriteAuditLogInput, "actor" | "ipAddress">,
-): Promise<WriteAuditLogInput> {
-  return {
-    ...input,
-    actor: actorFromSession(session),
-    ipAddress: await getRequestIpAddress(),
-  };
 }
 
 export async function createUserAction(formData: FormData) {
@@ -197,13 +186,14 @@ export async function changeOwnPasswordAction(formData: FormData) {
   try {
     await changeOwnPassword({
       userId: session.user.id,
+      currentSessionId: session.session.id,
       currentPassword,
       nextPassword,
       audit: await auditFor(session, {
         action: "user.password_change",
         resourceType: "user",
         resourceId: session.user.id,
-        summary: "修改本人密码",
+        summary: "修改本人密码并撤销其他会话",
       }),
     });
   } catch (error) {

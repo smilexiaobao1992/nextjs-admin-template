@@ -27,7 +27,7 @@
 - 邮箱密码登录，公开注册默认关闭，通过交互式命令创建管理员账号。
 - 动态 RBAC 权限控制，一个用户可关联多个角色并合并角色权限。
 - 在用户管理弹窗中调整角色、封禁账号、重置密码和撤销会话。
-- 在后台管理角色、权限与菜单，服务端同步校验授权范围。
+- 菜单与权限合并为一棵树（目录 / 页面 / 操作），角色授权在同一棵树上勾选，服务端同步校验授权范围。
 - 工作台展示真实的用户、角色、会话与审计统计，列表支持搜索和分页。
 - 两套响应式主题，登录页使用 GSAP 动效，并遵循系统的“减少动态效果”设置。
 
@@ -43,7 +43,7 @@
 
 - 公开注册默认关闭，只保留 Better Auth 官方 `/api/auth/[...all]` handler。
 - `/app` 使用 `dashboard:view`；业务页与 Server Action 使用动态权限（`requirePermission`）。
-- 角色 / 权限 / 菜单可在后台管理；`admin` 为系统超管，`member` 为默认可配置角色。
+- 角色与「菜单与权限」树可在后台管理；`admin` 为系统超管，`member` 为默认可配置角色。
 - 未登录访问受保护路径会跳到 `/login?next=…`，登录后回到安全的本地路径。
 - Better Auth Admin 插件只保留只读用户列表权限；写操作走带事务保护的 Server Action。
 - 会话 cookie cache 关闭，角色降权和会话撤销直接读取数据库状态。
@@ -147,7 +147,6 @@ alter default privileges for role postgres in schema public
 | `/app` | `dashboard:view`（统计卡片还会按用户 / 角色 / 审计权限裁剪） |
 | `/app/users` | `users:read` / 写操作用 `users:write`（含封禁、重置密码、撤销会话） |
 | `/app/roles` | `roles:read` / `roles:write` |
-| `/app/permissions` | `permissions:read` / `permissions:write` |
 | `/app/menus` | `menus:read` / `menus:write` |
 | `/app/audit` | `audit:read` |
 | `/app/profile` | 已登录（改密、管理本人会话） |
@@ -172,7 +171,7 @@ src/
   features/                    # 业务域（复制后主要加这里）
     dashboard/                 # 工作台统计查询
     users/
-    rbac/                      # 角色 / 权限 / 菜单 Server Actions
+    rbac/                      # 角色 / 菜单与权限 Server Actions 与授权树组件
   components/
     ui/                        # 含列表搜索、分页、状态提示
     layout/                    # AppShell 接收服务端过滤后的 menus
@@ -182,15 +181,15 @@ src/
     audit/                     # 审计写入与查询
     list/                      # 列表分页/搜索参数约定
     rbac/                      # 权限解析、校验、CRUD
-    db/                        # schema 含 role / permission / menu / audit_log
+    db/                        # schema 含 role / menu（权限树）/ role_menu / audit_log
     utils.ts
   proxy.ts                     # 仅转发 pathname（Next.js 16 Proxy）
 ```
 
 扩展建议：
 
-1. **新业务权限**：在「权限管理」新增 `orders:read` 等 key；在「角色管理」勾选；在页面/Action 调用 `requirePermission("orders:read")`。
-2. **新业务页**：`npm run scaffold:feature -- orders`，或手动建 `src/features/<domain>/` + `src/app/app/<route>/page.tsx`；在「菜单管理」加侧栏入口并绑定权限。
+1. **新业务页**：`npm run scaffold:feature -- orders`，或手动建 `src/features/<domain>/` + `src/app/app/<route>/page.tsx`。
+2. **注册权限**：在「菜单与权限」新增页面节点（路径 `/app/orders`，key `orders:read`），再在它下面新增操作节点（如 `orders:write`、`orders:export`）；到「角色」勾选授权；代码中调用 `requirePermission("orders:read")`。页面 key 留空表示所有登录用户可见。
 3. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
 4. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查是安全层。
 5. 关键写操作与 `writeAuditLog` 必须使用同一个数据库事务。

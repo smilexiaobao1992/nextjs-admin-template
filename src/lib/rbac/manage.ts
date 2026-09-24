@@ -1,17 +1,11 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { menu, permission, role, rolePermission, user } from "@/lib/db/schema";
+import { menu, role, roleMenu, user, type MenuNodeType } from "@/lib/db/schema";
 import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
 import { SYSTEM_ADMIN_ROLE_KEY } from "./constants";
 import { hasSystemAdminRole, parseRoleKeys } from "./role-keys";
-import {
-  canBeDefaultRole,
-  isSafeInternalHref,
-  isValidMenuParentSelection,
-  isValidPermissionKey,
-  isValidRoleKey,
-} from "./validate";
+import { canBeDefaultRole, isValidMenuNode, isValidRoleKey } from "./validate";
 
 export class RbacError extends Error {
   constructor(
@@ -34,11 +28,12 @@ function normalizeText(value: string, max = 100) {
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function assertRolePermissionScope(
+/** Delegated role managers may only grant or revoke menu nodes they hold themselves. */
+async function assertRoleGrantScope(
   tx: Transaction,
   actorRoleKey: string,
-  currentPermissionIds: string[],
-  nextPermissionIds: string[],
+  currentMenuIds: string[],
+  nextMenuIds: string[],
 ) {
   if (hasSystemAdminRole(actorRoleKey)) {
     return;
@@ -51,112 +46,64 @@ async function assertRolePermissionScope(
   if (actorRoles.length !== actorRoleKeys.length) {
     throw new RbacError("role_scope_forbidden");
   }
-  const actorPermissions = await tx
-    .select({ id: rolePermission.permissionId })
-    .from(rolePermission)
-    .where(inArray(rolePermission.roleId, actorRoles.map((item) => item.id)));
+  const actorGrants = actorRoles.length > 0
+    ? await tx
+      .select({ id: roleMenu.menuId })
+      .from(roleMenu)
+      .where(inArray(roleMenu.roleId, actorRoles.map((item) => item.id)))
+    : [];
   if (!canManageRolePermissionSets({
-    actorPermissionIds: actorPermissions.map((item) => item.id),
-    currentPermissionIds,
-    nextPermissionIds,
+    actorPermissionIds: actorGrants.map((item) => item.id),
+    currentPermissionIds: currentMenuIds,
+    nextPermissionIds: nextMenuIds,
   })) {
     throw new RbacError("role_scope_forbidden");
   }
 }
 
-// --- Permissions ---
+/**
+ * Keep only grantable nodes (those with a permission key) and grant the parent
+ * page of every checked action, so an operation is never granted without its page.
+ */
+async function normalizeGrantedMenuIds(tx: Transaction, menuIds: string[]) {
+  const requested = [...new Set(menuIds.filter(Boolean))];
+  if (requested.length === 0) {
+    return [];
+  }
 
-export async function createPermission(
-  input: { key: string; name: string; description?: string },
-  audit: WriteAuditLogInput,
-) {
-  const key = input.key.trim().toLowerCase();
-  const name = normalizeText(input.name);
-  const description = input.description?.trim() || null;
-
-  if (!isValidPermissionKey(key) || !name) {
+  const nodes = await tx
+    .select({ id: menu.id, parentId: menu.parentId, type: menu.type, permissionKey: menu.permissionKey })
+    .from(menu);
+  const byId = new Map(nodes.map((item) => [item.id, item]));
+  if (requested.some((id) => !byId.has(id))) {
     throw new RbacError("invalid_input");
   }
 
-  return db.transaction(async (tx) => {
-    const existing = await tx.select({ id: permission.id }).from(permission).where(eq(permission.key, key)).limit(1);
-    if (existing.length > 0) {
-      throw new RbacError("duplicate");
+  const granted = new Set<string>();
+  for (const id of requested) {
+    const node = byId.get(id)!;
+    if (!node.permissionKey) {
+      continue;
     }
-
-    const id = crypto.randomUUID();
-    await tx.insert(permission).values({ id, key, name, description, isSystem: false });
-    await writeAuditLog({ ...audit, resourceId: id }, tx);
-
-    return id;
-  });
-}
-
-export async function updatePermission(input: {
-  id: string;
-  name: string;
-  description?: string;
-}, audit: WriteAuditLogInput) {
-  const name = normalizeText(input.name);
-  const description = input.description?.trim() || null;
-
-  if (!input.id || !name) {
-    throw new RbacError("invalid_input");
+    granted.add(id);
+    const parent = node.type === "action" && node.parentId ? byId.get(node.parentId) : undefined;
+    if (parent?.type === "page" && parent.permissionKey) {
+      granted.add(parent.id);
+    }
   }
-
-  return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(permission).where(eq(permission.id, input.id)).limit(1);
-    if (!existing) {
-      throw new RbacError("not_found");
-    }
-
-    await tx
-      .update(permission)
-      .set({ name, description, updatedAt: new Date() })
-      .where(eq(permission.id, input.id));
-    await writeAuditLog(audit, tx);
-  });
+  return [...granted];
 }
 
-export async function deletePermission(id: string, audit: WriteAuditLogInput) {
-  return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(permission).where(eq(permission.id, id)).limit(1);
-    if (!existing) {
-      throw new RbacError("not_found");
-    }
-    if (existing.isSystem) {
-      throw new RbacError("system_locked");
-    }
+async function listRoleMenuIds(tx: Transaction, roleId: string) {
+  const rows = await tx.select({ id: roleMenu.menuId }).from(roleMenu).where(eq(roleMenu.roleId, roleId));
+  return rows.map((item) => item.id);
+}
 
-    const [roleReference, menuReference] = await Promise.all([
-      tx
-        .select({ id: rolePermission.roleId })
-        .from(rolePermission)
-        .innerJoin(role, eq(role.id, rolePermission.roleId))
-        .where(and(eq(rolePermission.permissionId, id), ne(role.key, SYSTEM_ADMIN_ROLE_KEY)))
-        .limit(1),
-      tx.select({ id: menu.id }).from(menu).where(eq(menu.permissionId, id)).limit(1),
-    ]);
-    if (roleReference.length > 0 || menuReference.length > 0) {
-      throw new RbacError("in_use");
-    }
-
-    // Older installations may still have a redundant admin binding. Remove
-    // only that row so a concurrent ordinary-role grant remains protected by
-    // the permission foreign key's RESTRICT behavior.
-    const [adminRole] = await tx
-      .select({ id: role.id })
-      .from(role)
-      .where(eq(role.key, SYSTEM_ADMIN_ROLE_KEY))
-      .limit(1);
-    if (adminRole) {
-      await tx
-        .delete(rolePermission)
-        .where(and(eq(rolePermission.permissionId, id), eq(rolePermission.roleId, adminRole.id)));
-    }
-    await tx.delete(permission).where(eq(permission.id, id));
-    await writeAuditLog(audit, tx);
-  });
+async function replaceRoleMenus(tx: Transaction, roleId: string, menuIds: string[]) {
+  await tx.delete(roleMenu).where(eq(roleMenu.roleId, roleId));
+  if (menuIds.length > 0) {
+    await tx.insert(roleMenu).values(menuIds.map((menuId) => ({ roleId, menuId })));
+  }
 }
 
 // --- Roles ---
@@ -165,7 +112,7 @@ export async function createRole(input: {
   key: string;
   name: string;
   description?: string;
-  permissionIds: string[];
+  menuIds: string[];
   isDefault?: boolean;
 }, actorRoleKey: string, audit: WriteAuditLogInput) {
   const key = input.key.trim().toLowerCase();
@@ -188,8 +135,8 @@ export async function createRole(input: {
     }
 
     const id = crypto.randomUUID();
-    const uniquePermissionIds = [...new Set(input.permissionIds.filter(Boolean))];
-    await assertRolePermissionScope(tx, actorRoleKey, [], uniquePermissionIds);
+    const menuIds = await normalizeGrantedMenuIds(tx, input.menuIds);
+    await assertRoleGrantScope(tx, actorRoleKey, [], menuIds);
     await tx.insert(role).values({
       id,
       key,
@@ -198,12 +145,7 @@ export async function createRole(input: {
       isSystem: false,
       isDefault: Boolean(input.isDefault),
     });
-
-    if (uniquePermissionIds.length > 0) {
-      await tx.insert(rolePermission).values(
-        uniquePermissionIds.map((permissionId) => ({ roleId: id, permissionId })),
-      );
-    }
+    await replaceRoleMenus(tx, id, menuIds);
     await writeAuditLog({ ...audit, resourceId: id }, tx);
 
     return id;
@@ -214,7 +156,7 @@ export async function updateRole(input: {
   id: string;
   name: string;
   description?: string;
-  permissionIds: string[];
+  menuIds: string[];
   isDefault?: boolean;
 }, actorRoleKey: string, audit: WriteAuditLogInput) {
   const name = normalizeText(input.name);
@@ -260,30 +202,16 @@ export async function updateRole(input: {
       })
       .where(eq(role.id, input.id));
 
-    // The system admin is authorized by role key and receives new permissions automatically.
-    // Ignore its submitted checkbox list so the stored bindings cannot be accidentally narrowed.
+    // The system admin is authorized by role key and receives every node automatically.
+    // Ignore its submitted tree so the stored grants cannot be accidentally narrowed.
     if (existing.key === SYSTEM_ADMIN_ROLE_KEY) {
       await writeAuditLog(audit, tx);
       return;
     }
 
-    const currentPermissions = await tx
-      .select({ id: rolePermission.permissionId })
-      .from(rolePermission)
-      .where(eq(rolePermission.roleId, input.id));
-    const uniquePermissionIds = [...new Set(input.permissionIds.filter(Boolean))];
-    await assertRolePermissionScope(
-      tx,
-      actorRoleKey,
-      currentPermissions.map((item) => item.id),
-      uniquePermissionIds,
-    );
-    await tx.delete(rolePermission).where(eq(rolePermission.roleId, input.id));
-    if (uniquePermissionIds.length > 0) {
-      await tx.insert(rolePermission).values(
-        uniquePermissionIds.map((permissionId) => ({ roleId: input.id, permissionId })),
-      );
-    }
+    const menuIds = await normalizeGrantedMenuIds(tx, input.menuIds);
+    await assertRoleGrantScope(tx, actorRoleKey, await listRoleMenuIds(tx, input.id), menuIds);
+    await replaceRoleMenus(tx, input.id, menuIds);
     await writeAuditLog(audit, tx);
   });
 }
@@ -316,152 +244,123 @@ export async function deleteRole(id: string, actorRoleKey: string, audit: WriteA
       throw new RbacError("last_default");
     }
 
-    const currentPermissions = await tx
-      .select({ id: rolePermission.permissionId })
-      .from(rolePermission)
-      .where(eq(rolePermission.roleId, id));
-    await assertRolePermissionScope(
-      tx,
-      actorRoleKey,
-      currentPermissions.map((item) => item.id),
-      [],
-    );
+    await assertRoleGrantScope(tx, actorRoleKey, await listRoleMenuIds(tx, id), []);
 
     await tx.delete(role).where(eq(role.id, id));
     await writeAuditLog(audit, tx);
   });
 }
 
-// --- Menus ---
+// --- Menu tree ---
 
-export async function createMenu(input: {
+export type MenuNodeInput = {
+  type: MenuNodeType;
   title: string;
-  href: string;
+  href?: string;
   icon?: string;
   sortOrder?: number;
   parentId?: string | null;
-  permissionId?: string | null;
+  permissionKey?: string | null;
   isVisible?: boolean;
-}, audit: WriteAuditLogInput) {
-  const title = normalizeText(input.title, 80);
-  const href = input.href.trim();
-  const icon = input.icon?.trim() || null;
-  const sortOrder = Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 0;
-  const parentId = input.parentId || null;
+};
 
-  if (!title || !isSafeInternalHref(href)) {
+function normalizeMenuInput(input: MenuNodeInput) {
+  const permissionKey = input.permissionKey?.trim().toLowerCase() || null;
+  return {
+    title: normalizeText(input.title, 80),
+    href: input.type === "page" ? (input.href ?? "").trim() : "",
+    icon: input.type === "action" ? null : input.icon?.trim() || null,
+    sortOrder: Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 0,
+    parentId: input.parentId || null,
+    permissionKey: input.type === "directory" ? null : permissionKey,
+    isVisible: input.isVisible !== false,
+  };
+}
+
+async function findParentType(tx: Transaction, parentId: string | null): Promise<MenuNodeType | null> {
+  if (!parentId) {
+    return null;
+  }
+  const [parent] = await tx.select({ type: menu.type }).from(menu).where(eq(menu.id, parentId)).limit(1);
+  if (!parent) {
+    throw new RbacError("invalid_input");
+  }
+  return parent.type;
+}
+
+async function assertPermissionKeyAvailable(tx: Transaction, permissionKey: string | null, menuId?: string) {
+  if (!permissionKey) {
+    return;
+  }
+  const [taken] = await tx
+    .select({ id: menu.id })
+    .from(menu)
+    .where(menuId
+      ? and(eq(menu.permissionKey, permissionKey), ne(menu.id, menuId))
+      : eq(menu.permissionKey, permissionKey))
+    .limit(1);
+  if (taken) {
+    throw new RbacError("duplicate");
+  }
+}
+
+export async function createMenu(input: MenuNodeInput, audit: WriteAuditLogInput) {
+  const values = normalizeMenuInput(input);
+  if (!values.title) {
     throw new RbacError("invalid_input");
   }
 
   return db.transaction(async (tx) => {
-    // Menu hierarchy writes are rare. Serializing them prevents two concurrent
+    // Tree writes are rare. Serializing them prevents two concurrent
     // re-parent operations from both validating against stale tree state.
     await tx.execute(sql`lock table menu in share row exclusive mode`);
 
-    if (parentId) {
-      const [parent] = await tx
-        .select({ id: menu.id, parentId: menu.parentId })
-        .from(menu)
-        .where(eq(menu.id, parentId))
-        .limit(1);
-      if (!parent || !isValidMenuParentSelection({ parentId, parentParentId: parent.parentId })) {
-        throw new RbacError("invalid_input");
-      }
+    const parentType = await findParentType(tx, values.parentId);
+    if (!isValidMenuNode({ type: input.type, parentType, permissionKey: values.permissionKey, href: values.href })) {
+      throw new RbacError("invalid_input");
     }
-
-    if (input.permissionId) {
-      const [perm] = await tx.select({ id: permission.id }).from(permission).where(eq(permission.id, input.permissionId)).limit(1);
-      if (!perm) {
-        throw new RbacError("invalid_input");
-      }
-    }
+    await assertPermissionKeyAvailable(tx, values.permissionKey);
 
     const id = crypto.randomUUID();
-    await tx.insert(menu).values({
-      id,
-      parentId,
-      title,
-      href,
-      icon,
-      sortOrder,
-      permissionId: input.permissionId || null,
-      isVisible: input.isVisible !== false,
-    });
+    await tx.insert(menu).values({ id, type: input.type, ...values, isSystem: false });
     await writeAuditLog({ ...audit, resourceId: id }, tx);
     return id;
   });
 }
 
-export async function updateMenu(input: {
-  id: string;
-  title: string;
-  href: string;
-  icon?: string;
-  sortOrder?: number;
-  parentId?: string | null;
-  permissionId?: string | null;
-  isVisible?: boolean;
-}, audit: WriteAuditLogInput) {
-  const title = normalizeText(input.title, 80);
-  const href = input.href.trim();
-  const icon = input.icon?.trim() || null;
-  const sortOrder = Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 0;
-  const parentId = input.parentId || null;
-
-  if (!input.id || !title || !isSafeInternalHref(href)) {
+/** A node's type is fixed at creation. System nodes may only change title, icon, order, and visibility. */
+export async function updateMenu(input: Omit<MenuNodeInput, "type"> & { id: string }, audit: WriteAuditLogInput) {
+  if (!input.id) {
     throw new RbacError("invalid_input");
   }
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`lock table menu in share row exclusive mode`);
 
-    const [existing] = await tx.select({ id: menu.id }).from(menu).where(eq(menu.id, input.id)).limit(1);
+    const [existing] = await tx.select().from(menu).where(eq(menu.id, input.id)).limit(1);
     if (!existing) {
       throw new RbacError("not_found");
     }
 
-    if (parentId) {
-      const [[parent], children] = await Promise.all([
-        tx
-          .select({ id: menu.id, parentId: menu.parentId })
-          .from(menu)
-          .where(eq(menu.id, parentId))
-          .limit(1),
-        tx.select({ id: menu.id }).from(menu).where(eq(menu.parentId, input.id)).limit(1),
-      ]);
-      if (
-        !parent ||
-        !isValidMenuParentSelection({
-          menuId: input.id,
-          parentId,
-          parentParentId: parent.parentId,
-          menuHasChildren: children.length > 0,
-        })
-      ) {
-        throw new RbacError("invalid_input");
-      }
+    const submitted = normalizeMenuInput({ ...input, type: existing.type });
+    const values = existing.isSystem
+      ? { ...submitted, href: existing.href, parentId: existing.parentId, permissionKey: existing.permissionKey }
+      : submitted;
+    if (!values.title || values.parentId === existing.id) {
+      throw new RbacError("invalid_input");
     }
 
-    if (input.permissionId) {
-      const [perm] = await tx.select({ id: permission.id }).from(permission).where(eq(permission.id, input.permissionId)).limit(1);
-      if (!perm) {
-        throw new RbacError("invalid_input");
-      }
+    const parentType = await findParentType(tx, values.parentId);
+    if (!isValidMenuNode({ type: existing.type, parentType, permissionKey: values.permissionKey, href: values.href })) {
+      throw new RbacError("invalid_input");
     }
+    await assertPermissionKeyAvailable(tx, values.permissionKey, existing.id);
 
-    await tx
-      .update(menu)
-      .set({
-        parentId,
-        title,
-        href,
-        icon,
-        sortOrder,
-        permissionId: input.permissionId || null,
-        isVisible: input.isVisible !== false,
-        updatedAt: new Date(),
-      })
-      .where(eq(menu.id, input.id));
+    await tx.update(menu).set({ ...values, updatedAt: new Date() }).where(eq(menu.id, existing.id));
+    if (!values.permissionKey) {
+      // Grants only apply to nodes that carry a permission key.
+      await tx.delete(roleMenu).where(eq(roleMenu.menuId, existing.id));
+    }
     await writeAuditLog(audit, tx);
   });
 }
@@ -470,13 +369,19 @@ export async function deleteMenu(id: string, audit: WriteAuditLogInput) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`lock table menu in share row exclusive mode`);
 
-    const [existing] = await tx.select({ id: menu.id }).from(menu).where(eq(menu.id, id)).limit(1);
+    const [existing] = await tx.select({ id: menu.id, isSystem: menu.isSystem }).from(menu).where(eq(menu.id, id)).limit(1);
     if (!existing) {
       throw new RbacError("not_found");
     }
+    if (existing.isSystem) {
+      throw new RbacError("system_locked");
+    }
 
-    const children = await tx.select({ id: menu.id }).from(menu).where(eq(menu.parentId, id)).limit(1);
-    if (children.length > 0) {
+    const [[child], [grant]] = await Promise.all([
+      tx.select({ id: menu.id }).from(menu).where(eq(menu.parentId, id)).limit(1),
+      tx.select({ id: roleMenu.roleId }).from(roleMenu).where(eq(roleMenu.menuId, id)).limit(1),
+    ]);
+    if (child || grant) {
       throw new RbacError("in_use");
     }
 

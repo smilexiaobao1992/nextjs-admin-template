@@ -72,9 +72,9 @@ import { actorFromSession, getRequestIpAddress, writeAuditLog } from "@/lib/audi
 import { requirePermission } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
-// Wire permission keys in the admin UI first:
-//   ${resource}:read
-//   ${resource}:write
+// Register these keys in 菜单与权限 first:
+//   ${resource}:read  (page node)
+//   ${resource}:write (action node under the page)
 
 export async function create${pascal}Action(formData: FormData) {
   const session = await requirePermission("${resource}:write");
@@ -119,7 +119,7 @@ export default async function ${pascal}Page({
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">${title}</p>
         <h1 className="text-3xl font-semibold tracking-[-0.022em]">${pascal}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          由 scaffold 生成的业务骨架。请补齐 schema、queries、actions，并在权限/菜单管理中注册入口。
+          由 scaffold 生成的业务骨架。请补齐 schema、queries、actions，并在「菜单与权限」中注册入口。
         </p>
       </div>
 
@@ -131,9 +131,9 @@ export default async function ${pascal}Page({
           当前 {items.length} 条。写权限：{canWrite ? "可用" : "只读"}。
         </p>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-          <li>在「权限管理」新增 <code>${resource}:read</code> / <code>${resource}:write</code></li>
-          <li>在「角色管理」勾选对应权限</li>
-          <li>在「菜单管理」添加侧栏入口并绑定 <code>${resource}:read</code></li>
+          <li>在「菜单与权限」新增页面：路径 <code>/app/${feature}</code>，权限 key <code>${resource}:read</code></li>
+          <li>在该页面下新增操作：权限 key <code>${resource}:write</code></li>
+          <li>在「角色」中勾选对应节点</li>
           <li>实现 <code>src/features/${feature}/</code> 与数据库表</li>
         </ol>
       </section>
@@ -154,7 +154,7 @@ console.log(`Scaffolded feature "${feature}":
   src/app/app/${feature}/page.tsx
 
 Next:
-  1. Add permissions ${resource}:read / ${resource}:write in the admin UI
-  2. Bind them to roles and create a menu entry
+  1. In 菜单与权限, add a page (/app/${feature}, key ${resource}:read) and an action under it (key ${resource}:write)
+  2. Grant them to roles in 角色
   3. Implement real queries/actions and schema migrations
 `);

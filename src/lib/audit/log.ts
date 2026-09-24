@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import type { AuditActor } from "./persistence";
+import type { AuditActor, WriteAuditLogInput } from "./persistence";
 
 export { writeAuditLog } from "./persistence";
 export type { AuditActor, WriteAuditLogInput } from "./persistence";
@@ -19,5 +19,17 @@ export function actorFromSession(session: {
   return {
     userId: session.user.id,
     email: session.user.email,
+  };
+}
+
+/** Attach the signed-in actor and request IP to an audit entry. */
+export async function auditFor(
+  session: { user: { id: string; email: string } },
+  input: Omit<WriteAuditLogInput, "actor" | "ipAddress">,
+): Promise<WriteAuditLogInput> {
+  return {
+    ...input,
+    actor: actorFromSession(session),
+    ipAddress: await getRequestIpAddress(),
   };
 }

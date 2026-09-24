@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canBeDefaultRole,
   isSafeInternalHref,
-  isValidMenuParentSelection,
+  isValidMenuNode,
   isValidPermissionKey,
   isValidRoleKey,
 } from "./validate";
@@ -28,12 +28,22 @@ describe("rbac validation", () => {
     expect(isSafeInternalHref("//evil.example")).toBe(false);
   });
 
-  it("accepts only root menus as parents and rejects self-parenting", () => {
-    expect(isValidMenuParentSelection({ menuId: "child", parentId: null, parentParentId: null })).toBe(true);
-    expect(isValidMenuParentSelection({ menuId: "child", parentId: "root", parentParentId: null })).toBe(true);
-    expect(isValidMenuParentSelection({ menuId: "root", parentId: "root", parentParentId: null })).toBe(false);
-    expect(isValidMenuParentSelection({ menuId: "child", parentId: "nested", parentParentId: "root" })).toBe(false);
-    expect(isValidMenuParentSelection({ menuId: "root", parentId: "other-root", parentParentId: null, menuHasChildren: true })).toBe(false);
+  it("enforces the directory / page / action tree rules", () => {
+    expect(isValidMenuNode({ type: "directory", parentType: null, permissionKey: null, href: "" })).toBe(true);
+    expect(isValidMenuNode({ type: "directory", parentType: "directory", permissionKey: null, href: "" })).toBe(false);
+    expect(isValidMenuNode({ type: "directory", parentType: null, permissionKey: "users:read", href: "" })).toBe(false);
+
+    expect(isValidMenuNode({ type: "page", parentType: null, permissionKey: "orders:read", href: "/app/orders" })).toBe(true);
+    expect(isValidMenuNode({ type: "page", parentType: "directory", permissionKey: null, href: "/app/help" })).toBe(true);
+    expect(isValidMenuNode({ type: "page", parentType: "page", permissionKey: null, href: "/app/help" })).toBe(false);
+    expect(isValidMenuNode({ type: "page", parentType: null, permissionKey: null, href: "" })).toBe(false);
+    expect(isValidMenuNode({ type: "page", parentType: null, permissionKey: null, href: "https://evil.example" })).toBe(false);
+
+    expect(isValidMenuNode({ type: "action", parentType: "page", permissionKey: "orders:export", href: "" })).toBe(true);
+    expect(isValidMenuNode({ type: "action", parentType: "directory", permissionKey: "reports:run", href: "" })).toBe(true);
+    expect(isValidMenuNode({ type: "action", parentType: null, permissionKey: "orders:export", href: "" })).toBe(false);
+    expect(isValidMenuNode({ type: "action", parentType: "page", permissionKey: null, href: "" })).toBe(false);
+    expect(isValidMenuNode({ type: "action", parentType: "page", permissionKey: "Orders", href: "" })).toBe(false);
   });
 
   it("never allows a system role to become the default signup role", () => {

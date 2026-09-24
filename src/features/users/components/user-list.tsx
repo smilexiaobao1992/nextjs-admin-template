@@ -9,6 +9,7 @@ import {
 import type { ListedUser } from "@/features/users/queries";
 import type { Role } from "@/lib/db/schema";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
+import { formatDate } from "@/lib/utils";
 import { UserManagementDialog } from "./user-management-dialog";
 
 export function UserList({
@@ -101,7 +102,7 @@ export function UserList({
                     ) : null}
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
-                    {item.createdAt.toLocaleDateString("zh-CN")}
+                    {formatDate(item.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
                     {canMutate ? (

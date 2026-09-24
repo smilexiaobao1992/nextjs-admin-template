@@ -11,7 +11,7 @@ import { parseListQuery } from "@/lib/list/pagination";
 import {
   isSystemAdminRole,
   listAllRoles,
-  listPermissionIdsByRole,
+  listMenuIdsByRole,
   roleHasPermission,
 } from "@/lib/rbac/permissions";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
@@ -24,10 +24,10 @@ export default async function UsersPage({
   const session = await requirePermission("users:read");
   const params = await searchParams;
   const listQuery = parseListQuery(params);
-  const [usersPage, roles, permissionIdsByRole] = await Promise.all([
+  const [usersPage, roles, menuIdsByRole] = await Promise.all([
     listUsersPage(listQuery),
     listAllRoles(),
-    listPermissionIdsByRole(),
+    listMenuIdsByRole(),
   ]);
   const roleKey = session.user.role ?? "";
   const canWrite = await roleHasPermission(roleKey, "users:write");
@@ -35,13 +35,13 @@ export default async function UsersPage({
   const actorRoleKeys = new Set(parseRoleKeys(roleKey));
   const actorPermissionIds = roles
     .filter((item) => actorRoleKeys.has(item.key))
-    .flatMap((item) => permissionIdsByRole[item.id] ?? []);
+    .flatMap((item) => menuIdsByRole[item.id] ?? []);
   const assignableRoles = canManageSystemRoles
     ? roles
     : roles.filter((item) =>
         !item.isSystem && canManageRolePermissionSets({
           actorPermissionIds,
-          nextPermissionIds: permissionIdsByRole[item.id] ?? [],
+          nextPermissionIds: menuIdsByRole[item.id] ?? [],
         }),
       );
   const manageableUserIds = new Set(
@@ -58,7 +58,7 @@ export default async function UsersPage({
         }
 
         const targetPermissionIds = targetRoles.flatMap(
-          (role) => permissionIdsByRole[role.id] ?? [],
+          (role) => menuIdsByRole[role.id] ?? [],
         );
         return canManageRolePermissionSets({
           actorPermissionIds,

@@ -5,7 +5,7 @@ export const userNoticeMessages: Record<string, string> = {
   unbanned: "用户已解封。",
   password_reset: "密码已重置，该用户需使用新密码重新登录。",
   sessions_revoked: "已撤销该用户的全部会话。",
-  password_changed: "密码已更新。",
+  password_changed: "密码已更新，其他设备上的登录已退出。",
   password_mismatch: "两次输入的新密码不一致。",
   session_revoked: "会话已撤销。",
   invalid_input: "请检查姓名、邮箱和密码。密码至少 12 位，并同时包含字母和数字。",

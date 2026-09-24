@@ -14,6 +14,10 @@ Notable changes to this template are documented here. This project follows seman
 
 ### Changed
 
+- Merge permissions into the menu tree (directory / page / action nodes) and grant roles through a single checkbox tree; drop the separate permission page. Existing permissions and grants are migrated.
+- Redesign the login page as a calm split layout with a theme-aware dot-wave canvas that follows the selected theme; remove GSAP.
+- Upgrade Next.js to 16.3.6 for critical security advisories and add security response headers.
+- Render server-side dates in Asia/Shanghai and revoke other sessions after a password change.
 - Upgrade Next.js to 16.3.0 and React to 19.2.8.
 - Pin Better Auth to 1.6.23 pending its schema-changing upgrade path.
 - Reduce dashboard query fan-out and cap each application database pool at five connections.

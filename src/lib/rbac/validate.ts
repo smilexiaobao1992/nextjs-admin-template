@@ -1,3 +1,4 @@
+import type { MenuNodeType } from "@/lib/db/schema";
 import { PERMISSION_KEY_PATTERN, ROLE_KEY_PATTERN } from "./constants";
 
 export function isValidPermissionKey(value: string): boolean {
@@ -30,22 +31,34 @@ export function isSafeInternalHref(value: string): boolean {
   }
 }
 
-export function isValidMenuParentSelection({
-  menuId,
-  parentId,
-  parentParentId,
-  menuHasChildren = false,
+/**
+ * Tree rules: directory at root; page at root or under a directory;
+ * action under a page or directory. Actions always carry a permission key,
+ * directories never do, and only pages have a route.
+ */
+export function isValidMenuNode({
+  type,
+  parentType,
+  permissionKey,
+  href,
 }: {
-  menuId?: string | null;
-  parentId: string | null;
-  parentParentId: string | null;
-  menuHasChildren?: boolean;
+  type: MenuNodeType;
+  parentType: MenuNodeType | null;
+  permissionKey: string | null;
+  href: string;
 }): boolean {
-  if (!parentId) {
-    return true;
+  if (permissionKey !== null && !isValidPermissionKey(permissionKey)) {
+    return false;
   }
 
-  return !menuHasChildren && parentId !== menuId && parentParentId === null;
+  switch (type) {
+    case "directory":
+      return parentType === null && permissionKey === null && href === "";
+    case "page":
+      return (parentType === null || parentType === "directory") && href !== "" && isSafeInternalHref(href);
+    case "action":
+      return (parentType === "page" || parentType === "directory") && permissionKey !== null && href === "";
+  }
 }
 
 export function canBeDefaultRole({ isSystem }: { isSystem: boolean }): boolean {
