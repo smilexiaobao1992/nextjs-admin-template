@@ -9,11 +9,12 @@ import { rbacNoticeMessages } from "@/features/rbac/messages";
 import { requirePermission } from "@/lib/auth/session";
 import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
+import { MenuGrantTree, type GrantTreeNode } from "@/features/rbac/components/menu-grant-tree";
 import {
   isSystemAdminRole,
-  listAllPermissions,
+  listAllMenus,
   listAllRoles,
-  listPermissionIdsByRole,
+  listMenuIdsByRole,
   roleHasPermission,
 } from "@/lib/rbac/permissions";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
@@ -27,28 +28,33 @@ export default async function RolesPage({
   const session = await requirePermission("roles:read");
   const { notice, selected: selectedId, mode } = await searchParams;
   const roleKey = session.user.role ?? "";
-  const [roles, permissions, rolePermissions, canWrite] = await Promise.all([
+  const [roles, menus, roleMenuIds, canWrite] = await Promise.all([
     listAllRoles(),
-    listAllPermissions(),
-    listPermissionIdsByRole(),
+    listAllMenus(),
+    listMenuIdsByRole(),
     roleHasPermission(roleKey, "roles:write"),
   ]);
   const selectedRole = roles.find((item) => item.id === selectedId) ?? roles[0] ?? null;
   const createMode = canWrite && mode === "create";
   const canManageSystemRoles = isSystemAdminRole(roleKey);
   const actorRoleKeys = new Set(parseRoleKeys(roleKey));
-  const actorPermissionIds = roles
+  const actorMenuIds = roles
     .filter((item) => actorRoleKeys.has(item.key))
-    .flatMap((item) => rolePermissions[item.id] ?? []);
-  const actorPermissionIdSet = new Set(actorPermissionIds);
-  const editablePermissions = canManageSystemRoles
-    ? permissions
-    : permissions.filter((item) => actorPermissionIdSet.has(item.id));
+    .flatMap((item) => roleMenuIds[item.id] ?? []);
+  const editableMenuIds = canManageSystemRoles ? null : [...new Set(actorMenuIds)];
+  const treeNodes: GrantTreeNode[] = menus.map(({ id, parentId, type, title, permissionKey, sortOrder }) => ({
+    id,
+    parentId,
+    type,
+    title,
+    permissionKey,
+    sortOrder,
+  }));
   const canManageSelectedRole = canManageSystemRoles || (selectedRole
     ? canManageRolePermissionSets({
-        actorPermissionIds,
-        currentPermissionIds: rolePermissions[selectedRole.id] ?? [],
-        nextPermissionIds: rolePermissions[selectedRole.id] ?? [],
+        actorPermissionIds: actorMenuIds,
+        currentPermissionIds: roleMenuIds[selectedRole.id] ?? [],
+        nextPermissionIds: roleMenuIds[selectedRole.id] ?? [],
       })
     : false);
 
@@ -144,7 +150,7 @@ export default async function RolesPage({
                     <Input id="role-description" name="description" maxLength={200} />
                   </div>
                 </div>
-                <PermissionMatrix permissions={editablePermissions} selectedIds={new Set()} />
+                <MenuGrantTree nodes={treeNodes} grantedIds={[]} editableIds={editableMenuIds} />
                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
                   <label className="flex min-h-10 items-center gap-2 text-sm">
                     <input type="checkbox" name="isDefault" />
@@ -157,8 +163,9 @@ export default async function RolesPage({
           ) : selectedRole ? (
             <RoleDetail
               role={selectedRole}
-              permissions={canManageSelectedRole ? editablePermissions : permissions}
-              selectedIds={new Set(rolePermissions[selectedRole.id] ?? [])}
+              nodes={treeNodes}
+              grantedIds={roleMenuIds[selectedRole.id] ?? []}
+              editableIds={editableMenuIds}
               canEdit={canWrite && canManageSelectedRole && (!selectedRole.isSystem || canManageSystemRoles)}
             />
           ) : (
@@ -175,17 +182,17 @@ export default async function RolesPage({
 }
 
 type RoleRow = Awaited<ReturnType<typeof listAllRoles>>[number];
-type PermissionRow = Awaited<ReturnType<typeof listAllPermissions>>[number];
-
 function RoleDetail({
   role,
-  permissions,
-  selectedIds,
+  nodes,
+  grantedIds,
+  editableIds,
   canEdit,
 }: {
   role: RoleRow;
-  permissions: PermissionRow[];
-  selectedIds: Set<string>;
+  nodes: GrantTreeNode[];
+  grantedIds: string[];
+  editableIds: string[] | null;
   canEdit: boolean;
 }) {
   const isAdmin = role.key === SYSTEM_ADMIN_ROLE_KEY;
@@ -236,7 +243,7 @@ function RoleDetail({
               系统管理员始终拥有全部权限，无需逐项配置。
             </div>
           ) : (
-            <PermissionMatrix permissions={permissions} selectedIds={selectedIds} />
+            <MenuGrantTree nodes={nodes} grantedIds={grantedIds} editableIds={editableIds} />
           )}
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
             <label className="flex min-h-10 items-center gap-2 text-sm">
@@ -255,81 +262,10 @@ function RoleDetail({
           {isAdmin ? (
             <p className="rounded-lg bg-secondary/70 px-4 py-3 text-sm text-secondary-foreground">系统管理员自动拥有全部权限。</p>
           ) : (
-            <PermissionMatrix permissions={permissions} selectedIds={selectedIds} readOnly />
+            <MenuGrantTree nodes={nodes} grantedIds={grantedIds} editableIds={editableIds} readOnly />
           )}
         </div>
       )}
     </>
-  );
-}
-
-function PermissionMatrix({
-  permissions,
-  selectedIds,
-  readOnly = false,
-}: {
-  permissions: PermissionRow[];
-  selectedIds: Set<string>;
-  readOnly?: boolean;
-}) {
-  const groups = permissions.reduce<Record<string, PermissionRow[]>>((result, permission) => {
-    const resource = permission.key.split(":", 1)[0] || "other";
-    (result[resource] ??= []).push(permission);
-    return result;
-  }, {});
-  const actionLabels: Record<string, string> = {
-    view: "访问",
-    read: "查看",
-    write: "管理",
-    create: "创建",
-    update: "编辑",
-    delete: "删除",
-  };
-  const visibleGroups = Object.entries(groups)
-    .map(([resource, items]) => [
-      resource,
-      readOnly ? items.filter((item) => selectedIds.has(item.id)) : items,
-    ] as const)
-    .filter(([, items]) => items.length > 0);
-
-  return (
-    <fieldset>
-      <legend className="mb-3 text-sm font-medium">权限范围</legend>
-      {visibleGroups.length === 0 ? (
-        <p className="rounded-lg bg-secondary/45 px-4 py-6 text-center text-sm text-muted-foreground">
-          未分配任何权限
-        </p>
-      ) : (
-        <div className="overflow-hidden rounded-lg bg-secondary/35">
-          {visibleGroups.map(([resource, items], index) => (
-            <div key={resource} className={cn("grid gap-3 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-center", index > 0 && "border-t border-border/70")}>
-              <div className="min-w-0">
-                <p className="truncate font-mono text-sm font-medium">{resource}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{items[0]?.name.replace(/^(查看|管理|访问|创建|编辑|删除)/, "") || resource}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {items.map((permission) => {
-                  const action = permission.key.split(":")[1] || permission.key;
-                  const checked = selectedIds.has(permission.id);
-                  if (readOnly) {
-                    return (
-                      <span key={permission.id} className="flex min-h-10 items-center rounded-lg bg-card/80 px-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.05)]">
-                        {actionLabels[action] ?? action}
-                      </span>
-                    );
-                  }
-                  return (
-                    <label key={permission.id} className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-card/70 px-3 text-sm transition-colors hover:bg-accent">
-                      <input type="checkbox" name="permissionIds" value={permission.id} defaultChecked={checked} />
-                      <span>{actionLabels[action] ?? action}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </fieldset>
   );
 }

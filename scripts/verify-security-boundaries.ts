@@ -1,19 +1,18 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, dbClient } from "../src/lib/db";
-import { account, auditLog, permission, role, rolePermission, session, user } from "../src/lib/db/schema";
+import { account, auditLog, menu, role, roleMenu, session, user } from "../src/lib/db/schema";
 import { resetUserPassword, revokeAllUserSessions, UserManagementError } from "../src/lib/auth/user-management";
-import { createPermission, createRole, deleteRole, RbacError, updateRole } from "../src/lib/rbac/manage";
+import { createMenu, createRole, deleteRole, RbacError, updateRole } from "../src/lib/rbac/manage";
 
 const actorRoleId = "verify_security_actor_role";
 const actorRoleKey = "verify-security-actor";
 const actorUserId = "verify_security_actor_user";
 const targetUserId = "verify_security_admin_user";
 const targetSessionId = "verify_security_admin_session";
-const candidateRoleId = "verify_security_candidate_role";
 const candidateRoleKey = "verify-security-candidate";
 const protectedRoleId = "verify_security_protected_role";
 const protectedRoleKey = "verify-security-protected";
-const rollbackPermissionKey = "verify_security:write";
+const rollbackPermissionKey = "verify_security:rollback";
 const verificationAudit = {
   actor: { userId: actorUserId, email: "verify-security-actor@example.invalid" },
   action: "security.verify",
@@ -51,32 +50,31 @@ async function cleanup() {
   await db.delete(auditLog).where(
     inArray(auditLog.resourceId, [
       actorRoleId,
-      candidateRoleId,
       protectedRoleId,
       actorUserId,
       targetUserId,
     ]),
   );
+  await db.delete(auditLog).where(eq(auditLog.actorUserId, actorUserId));
   await db.delete(session).where(eq(session.id, targetSessionId));
   await db.delete(account).where(inArray(account.userId, [actorUserId, targetUserId]));
   await db.delete(user).where(inArray(user.id, [actorUserId, targetUserId]));
-  await db.delete(rolePermission).where(
-    inArray(rolePermission.roleId, [actorRoleId, candidateRoleId, protectedRoleId]),
-  );
-  await db.delete(role).where(inArray(role.id, [actorRoleId, candidateRoleId, protectedRoleId]));
-  await db.delete(permission).where(eq(permission.key, rollbackPermissionKey));
+  // role_menu rows cascade with their role.
+  await db.delete(role).where(inArray(role.key, [actorRoleKey, candidateRoleKey, protectedRoleKey]));
+  await db.delete(menu).where(eq(menu.permissionKey, rollbackPermissionKey));
 }
 
 async function main() {
   await cleanup();
 
-  const permissions = await db
-    .select({ id: permission.id, key: permission.key })
-    .from(permission)
-    .where(inArray(permission.key, ["roles:write", "users:write"]));
-  const rolesWriteId = permissions.find((item) => item.key === "roles:write")?.id;
-  const usersWriteId = permissions.find((item) => item.key === "users:write")?.id;
-  assert(rolesWriteId && usersWriteId, "seeded roles:write and users:write permissions are required");
+  const nodes = await db
+    .select({ id: menu.id, key: menu.permissionKey })
+    .from(menu)
+    .where(inArray(menu.permissionKey, ["roles:read", "roles:write", "users:write"]));
+  const rolesReadId = nodes.find((item) => item.key === "roles:read")?.id;
+  const rolesWriteId = nodes.find((item) => item.key === "roles:write")?.id;
+  const usersWriteId = nodes.find((item) => item.key === "users:write")?.id;
+  assert(rolesReadId && rolesWriteId && usersWriteId, "seeded roles:read, roles:write and users:write nodes are required");
 
   await db.transaction(async (tx) => {
     await tx.insert(role).values({
@@ -89,7 +87,10 @@ async function main() {
       key: protectedRoleKey,
       name: "Security verification protected role",
     });
-    await tx.insert(rolePermission).values({ roleId: actorRoleId, permissionId: rolesWriteId });
+    await tx.insert(roleMenu).values([
+      { roleId: actorRoleId, menuId: rolesReadId },
+      { roleId: actorRoleId, menuId: rolesWriteId },
+    ]);
     await tx.insert(user).values([
       {
         id: actorUserId,
@@ -124,7 +125,7 @@ async function main() {
       {
         id: actorRoleId,
         name: "Security verification actor",
-        permissionIds: [rolesWriteId, usersWriteId],
+        menuIds: [rolesReadId, rolesWriteId, usersWriteId],
       },
       actorRoleKey,
       verificationAudit,
@@ -136,11 +137,27 @@ async function main() {
       {
         key: candidateRoleKey,
         name: "Security verification candidate",
-        permissionIds: [usersWriteId],
+        menuIds: [usersWriteId],
       },
       actorRoleKey,
       verificationAudit,
     ),
+  );
+
+  // Granting an action implicitly grants its page, and stays within the actor's scope.
+  await createRole(
+    { key: candidateRoleKey, name: "Security verification candidate", menuIds: [rolesWriteId] },
+    actorRoleKey,
+    { ...verificationAudit, actor: { userId: actorUserId, email: "verify-security-actor@example.invalid" } },
+  );
+  const candidateGrants = await db
+    .select({ menuId: roleMenu.menuId })
+    .from(roleMenu)
+    .innerJoin(role, eq(role.id, roleMenu.roleId))
+    .where(eq(role.key, candidateRoleKey));
+  assert(
+    candidateGrants.length === 2 && candidateGrants.some((item) => item.menuId === rolesReadId),
+    "granting an action must also grant its parent page",
   );
 
   await expectDomainError("delegated admin password reset", "system_role_forbidden", () =>
@@ -174,12 +191,12 @@ async function main() {
 
   let auditWriteFailed = false;
   try {
-    await createPermission(
-      { key: rollbackPermissionKey, name: "Security rollback verification" },
+    await createMenu(
+      { type: "action", parentId: rolesReadId, title: "Security rollback verification", permissionKey: rollbackPermissionKey },
       {
         actor: { userId: "verify_security_missing_actor", email: null },
-        action: "permission.create",
-        resourceType: "permission",
+        action: "menu.create",
+        resourceType: "menu",
         summary: "Force audit foreign-key failure",
       },
     );
@@ -192,19 +209,19 @@ async function main() {
   }
   assert(auditWriteFailed, "atomic audit verification must fail while writing its audit row");
 
-  const [rolledBackPermission] = await db
-    .select({ id: permission.id })
-    .from(permission)
-    .where(eq(permission.key, rollbackPermissionKey));
-  assert(!rolledBackPermission, "failed audit insert must roll back the protected mutation");
+  const [rolledBackNode] = await db
+    .select({ id: menu.id })
+    .from(menu)
+    .where(eq(menu.permissionKey, rollbackPermissionKey));
+  assert(!rolledBackNode, "failed audit insert must roll back the protected mutation");
 
   const [unexpectedBinding] = await db
-    .select({ permissionId: rolePermission.permissionId })
-    .from(rolePermission)
+    .select({ menuId: roleMenu.menuId })
+    .from(roleMenu)
     .where(
       and(
-        eq(rolePermission.roleId, actorRoleId),
-        eq(rolePermission.permissionId, usersWriteId),
+        eq(roleMenu.roleId, actorRoleId),
+        eq(roleMenu.menuId, usersWriteId),
       ),
     );
   assert(!unexpectedBinding, "delegated role must not gain a permission it does not hold");

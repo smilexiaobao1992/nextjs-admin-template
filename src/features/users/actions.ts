@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { actorFromSession, getRequestIpAddress, type WriteAuditLogInput } from "@/lib/audit/log";
+import { auditFor } from "@/lib/audit/log";
 import { requirePermission, requireSession } from "@/lib/auth/session";
 import {
   changeOwnPassword,
@@ -28,17 +28,6 @@ function revalidateUserSurfaces() {
   revalidatePath("/app/users");
   revalidatePath("/app/profile");
   revalidatePath("/app/audit");
-}
-
-async function auditFor(
-  session: { user: { id: string; email: string } },
-  input: Omit<WriteAuditLogInput, "actor" | "ipAddress">,
-): Promise<WriteAuditLogInput> {
-  return {
-    ...input,
-    actor: actorFromSession(session),
-    ipAddress: await getRequestIpAddress(),
-  };
 }
 
 export async function createUserAction(formData: FormData) {

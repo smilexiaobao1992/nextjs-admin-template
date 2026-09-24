@@ -1,7 +1,7 @@
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { and, desc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, role, rolePermission, session, user } from "@/lib/db/schema";
+import { account, role, roleMenu, session, user } from "@/lib/db/schema";
 import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
 import { DEFAULT_MEMBER_ROLE_KEY, SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
 import { hasSystemAdminRole, parseRoleKeys, serializeRoleKeys } from "@/lib/rbac/role-keys";
@@ -60,14 +60,15 @@ async function getRoleRows(tx: Transaction, roleKeys: string[]) {
   return rows;
 }
 
+/** Granted menu node ids, the unit delegated managers are scoped by. */
 async function getPermissionIdsForRoles(tx: Transaction, roleIds: string[]) {
   if (roleIds.length === 0) {
     return [];
   }
   const rows = await tx
-    .select({ id: rolePermission.permissionId })
-    .from(rolePermission)
-    .where(inArray(rolePermission.roleId, roleIds));
+    .select({ id: roleMenu.menuId })
+    .from(roleMenu)
+    .where(inArray(roleMenu.roleId, roleIds));
   return [...new Set(rows.map((item) => item.id))];
 }
 

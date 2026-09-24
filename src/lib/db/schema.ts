@@ -34,16 +34,6 @@ export const role = pgTable(
   ],
 );
 
-export const permission = pgTable("permission", {
-  id: text("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description"),
-  isSystem: boolean("is_system").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const user = pgTable(
   "user",
   {
@@ -128,41 +118,59 @@ export const rateLimit = pgTable("rate_limit", {
   lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
-export const rolePermission = pgTable(
-  "role_permission",
-  {
-    roleId: text("role_id")
-      .notNull()
-      .references(() => role.id, { onDelete: "cascade" }),
-    permissionId: text("permission_id")
-      .notNull()
-      .references(() => permission.id, { onDelete: "restrict" }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.roleId, table.permissionId] }),
-    index("role_permission_permission_id_idx").on(table.permissionId),
-  ],
-);
+export const MENU_NODE_TYPES = ["directory", "page", "action"] as const;
+export type MenuNodeType = (typeof MENU_NODE_TYPES)[number];
 
+/**
+ * Unified navigation and permission tree.
+ * directory: nav group; page: routable nav entry; action: operation permission (never in nav).
+ */
 export const menu = pgTable(
   "menu",
   {
     id: text("id").primaryKey(),
     parentId: text("parent_id").references((): AnyPgColumn => menu.id, { onDelete: "restrict" }),
+    type: text("type", { enum: MENU_NODE_TYPES }).notNull().default("page"),
     title: text("title").notNull(),
-    href: text("href").notNull(),
+    href: text("href").notNull().default(""),
     icon: text("icon"),
     sortOrder: integer("sort_order").notNull().default(0),
-    permissionId: text("permission_id").references(() => permission.id, {
-      onDelete: "restrict",
-    }),
+    /** Permission key granted by this node. Null on a page means any signed-in user may open it. */
+    permissionKey: text("permission_key"),
     isVisible: boolean("is_visible").notNull().default(true),
+    isSystem: boolean("is_system").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("menu_parent_id_idx").on(table.parentId),
     index("menu_sort_order_idx").on(table.sortOrder),
-    index("menu_permission_id_idx").on(table.permissionId),
+    uniqueIndex("menu_permission_key_idx")
+      .on(table.permissionKey)
+      .where(sql`${table.permissionKey} is not null`),
+    check("menu_type_check", sql`${table.type} in ('directory', 'page', 'action')`),
+    check(
+      "menu_permission_key_by_type_check",
+      sql`(${table.type} = 'directory' and ${table.permissionKey} is null)
+        or (${table.type} = 'action' and ${table.permissionKey} is not null)
+        or ${table.type} = 'page'`,
+    ),
+  ],
+);
+
+export const roleMenu = pgTable(
+  "role_menu",
+  {
+    roleId: text("role_id")
+      .notNull()
+      .references(() => role.id, { onDelete: "cascade" }),
+    menuId: text("menu_id")
+      .notNull()
+      .references(() => menu.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roleId, table.menuId] }),
+    index("role_menu_menu_id_idx").on(table.menuId),
   ],
 );
 
@@ -192,6 +200,5 @@ export const auditLog = pgTable(
 export type User = typeof user.$inferSelect;
 export type Session = typeof session.$inferSelect;
 export type Role = typeof role.$inferSelect;
-export type Permission = typeof permission.$inferSelect;
 export type Menu = typeof menu.$inferSelect;
 export type AuditLog = typeof auditLog.$inferSelect;
