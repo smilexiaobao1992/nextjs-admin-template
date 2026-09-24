@@ -1,5 +1,5 @@
 import { hashPassword, verifyPassword } from "better-auth/crypto";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account, role, rolePermission, session, user } from "@/lib/db/schema";
 import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
@@ -370,11 +370,13 @@ export async function resetUserPassword({
 
 export async function changeOwnPassword({
   userId,
+  currentSessionId,
   currentPassword,
   nextPassword,
   audit,
 }: {
   userId: string;
+  currentSessionId: string;
   currentPassword: string;
   nextPassword: string;
   audit: WriteAuditLogInput;
@@ -407,6 +409,9 @@ export async function changeOwnPassword({
       .update(account)
       .set({ password: hashed, updatedAt: new Date() })
       .where(eq(account.id, credential.id));
+    await tx
+      .delete(session)
+      .where(and(eq(session.userId, userId), ne(session.id, currentSessionId)));
     await writeAuditLog(audit, tx);
   });
 }

@@ -16,6 +16,7 @@ import { profileNoticeMessages } from "@/features/users/messages";
 import { listSessionsForUser } from "@/lib/auth/user-management";
 import { requireSession } from "@/lib/auth/session";
 import { listRolesForRoleValue } from "@/lib/rbac/permissions";
+import { formatDateTime } from "@/lib/utils";
 
 export default async function ProfilePage({
   searchParams,
@@ -145,7 +146,7 @@ export default async function ProfilePage({
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {item.updatedAt.toLocaleString("zh-CN")}
+                      {formatDateTime(item.updatedAt)}
                       {isCurrent ? (
                         <span className="ml-2 inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary">
                           当前
@@ -157,7 +158,7 @@ export default async function ProfilePage({
                       {item.userAgent ?? "—"}
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {item.expiresAt.toLocaleString("zh-CN")}
+                      {formatDateTime(item.expiresAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       {isCurrent ? (

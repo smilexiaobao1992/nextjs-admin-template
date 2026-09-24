@@ -197,13 +197,14 @@ export async function changeOwnPasswordAction(formData: FormData) {
   try {
     await changeOwnPassword({
       userId: session.user.id,
+      currentSessionId: session.session.id,
       currentPassword,
       nextPassword,
       audit: await auditFor(session, {
         action: "user.password_change",
         resourceType: "user",
         resourceId: session.user.id,
-        summary: "修改本人密码",
+        summary: "修改本人密码并撤销其他会话",
       }),
     });
   } catch (error) {

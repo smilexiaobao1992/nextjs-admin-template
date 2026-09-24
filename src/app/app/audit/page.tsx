@@ -11,6 +11,7 @@ import {
 import { listAuditLogsPage } from "@/lib/audit/queries";
 import { requirePermission } from "@/lib/auth/session";
 import { parseListQuery } from "@/lib/list/pagination";
+import { formatDateTime } from "@/lib/utils";
 
 export default async function AuditPage({
   searchParams,
@@ -75,7 +76,7 @@ export default async function AuditPage({
               {result.items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                    {item.createdAt.toLocaleString("zh-CN")}
+                    {formatDateTime(item.createdAt)}
                   </TableCell>
                   <TableCell className="max-w-40 truncate text-sm">
                     {item.actorEmail ?? "—"}

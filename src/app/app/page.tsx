@@ -5,6 +5,7 @@ import { getDashboardStats } from "@/features/dashboard/queries";
 import { listRecentUsers } from "@/features/users/queries";
 import { isSystemAdminRole, listAllRoles, listPermissionKeysForRoleKey } from "@/lib/rbac/permissions";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
+import { formatDate } from "@/lib/utils";
 
 export default async function AppPage() {
   const session = await requirePermission("dashboard:view");
@@ -95,7 +96,7 @@ export default async function AppPage() {
                       {parseRoleKeys(item.role).map((key) => roleNameByKey[key] ?? key).join("、")}
                     </p>
                     <p className="text-xs tabular-nums text-muted-foreground">
-                      {item.createdAt.toLocaleDateString("zh-CN")}
+                      {formatDate(item.createdAt)}
                       {item.banned ? " · 已封禁" : ""}
                     </p>
                   </div>
