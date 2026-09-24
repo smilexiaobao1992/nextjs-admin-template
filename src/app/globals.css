@@ -182,6 +182,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@keyframes login-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-enter {
+    animation: login-enter 200ms ease-out both;
+  }
+}
+
 button,
 a {
   touch-action: manipulation;

@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { defaultAc } from "better-auth/plugins/admin/access";
 import type { AccessControl } from "better-auth/plugins/access";
+import { siteConfig } from "@/config/site";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { adminRole, userRole } from "@/lib/auth/access";
@@ -16,7 +17,7 @@ function trustedOrigins(): string[] | undefined {
 }
 
 export const auth = betterAuth({
-  appName: "管理中心",
+  appName: siteConfig.name,
   baseURL: validateBetterAuthUrl(process.env.BETTER_AUTH_URL),
   secret: validateBetterAuthSecret(process.env.BETTER_AUTH_SECRET),
   trustedOrigins: trustedOrigins(),

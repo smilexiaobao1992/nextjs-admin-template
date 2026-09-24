@@ -6,6 +6,7 @@ import { createElement, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resolveMenuIcon } from "@/components/layout/menu-icons";
+import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import type { NavMenuItem } from "@/lib/rbac/permissions";
 
@@ -213,14 +214,14 @@ export default function AppSidebar({
         <Link
           href="/app"
           onClick={onNavigate}
-          aria-label={collapsed ? "管理中心首页" : undefined}
+          aria-label={collapsed ? `${siteConfig.name}首页` : undefined}
           className="flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ShieldCheck aria-hidden="true" className="size-5" />
           </span>
           {collapsed ? null : (
-            <span className="truncate text-sm font-semibold tracking-[-0.012em] text-sidebar-foreground">管理中心</span>
+            <span className="truncate text-sm font-semibold tracking-[-0.012em] text-sidebar-foreground">{siteConfig.name}</span>
           )}
         </Link>
 
