@@ -17,6 +17,7 @@ Notable changes to this template are documented here. This project follows seman
 
 ### Security
 
+- Upgrade Next.js and `eslint-config-next` to 16.4.0, resolving GHSA-3w37-wq28-93x7, GHSA-4jqv-mc3x-m676, GHSA-39w2-rjm5-chcv, GHSA-f87g-xv8r-7p7x, GHSA-mcj8-r9mp-w47p, and GHSA-cjq9-62q9-8jv4; update `sharp` and `source-map-js` dependencies to remediate CVE-2026-96889 and GHSA-68fv-2mgg-jv7q.
 - Prevent delegated role managers from granting permissions outside their own scope.
 - Prevent delegated user managers from modifying system-role and administrator accounts.
 - Require `dashboard:view` and hide dashboard data without its underlying read permission.

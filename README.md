@@ -33,7 +33,7 @@
 
 ## 技术栈
 
-- Next.js 16.3、React 19.2、TypeScript、Tailwind CSS 4
+- Next.js 16.4、React 19.2、TypeScript、Tailwind CSS 4
 - Better Auth 1.6，邮箱密码登录与 Admin 插件
 - Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
 - Zod、Vitest、Testing Library、ESLint、GitHub Actions
