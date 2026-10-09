@@ -26,8 +26,9 @@ export default function GlobalError({
   };
 
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         style={{
           margin: 0,
           fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
