@@ -11,7 +11,7 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
   return (
     <section
       aria-labelledby="create-user-title"
-      className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
+      className="rounded-xl bg-card p-5 shadow-card sm:p-6"
     >
       <div className="mb-5 flex items-center gap-3">
         <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">

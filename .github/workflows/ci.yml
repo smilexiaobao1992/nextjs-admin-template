@@ -33,7 +33,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/admin_template
       DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/admin_template
       BETTER_AUTH_SECRET: ci-only-secret-with-at-least-32-bytes
-      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:3002
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4

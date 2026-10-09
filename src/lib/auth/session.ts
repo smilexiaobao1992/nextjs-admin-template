@@ -50,3 +50,13 @@ export async function requirePermission(permissionKey: string) {
 
   return session;
 }
+
+export type AppSession = Awaited<ReturnType<typeof requireSession>>;
+
+/**
+ * Non-redirecting permission check for conditional UI (show a button, enable a form).
+ * Server Actions must still call requirePermission; hiding UI is not authorization.
+ */
+export async function can(session: Pick<AppSession, "user">, permissionKey: string): Promise<boolean> {
+  return roleHasPermission(session.user.role ?? "", permissionKey);
+}

@@ -10,14 +10,16 @@
     "build": "next build",
     "start": "next start --port 3002",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test",
+    "setup": "node --env-file-if-exists=.env.local --import tsx scripts/setup.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:verify": "node --env-file-if-exists=.env.local --import tsx scripts/verify-rbac-database.ts",
     "db:verify:security": "node --env-file-if-exists=.env.local --import tsx scripts/verify-security-boundaries.ts",
+    "db:seed": "node --env-file-if-exists=.env.local --import tsx scripts/seed.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "admin:create": "node --env-file-if-exists=.env.local --import tsx scripts/create-admin.ts",
@@ -44,7 +46,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

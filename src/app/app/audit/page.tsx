@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import {
@@ -25,15 +26,13 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-7">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">审计</p>
-        <h1 className="text-3xl font-semibold tracking-[-0.022em]">操作审计</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          只读查看关键写操作记录。审计行由系统追加写入，普通用户不可修改或删除。
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="审计"
+        title="操作审计"
+        description="只读查看关键写操作记录。审计行由系统追加写入，普通用户不可修改或删除。"
+      />
 
-      <div className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+      <div className="rounded-xl bg-card p-5 shadow-card">
         <ListSearchForm
           action="/app/audit"
           defaultQuery={listQuery.q}
@@ -44,7 +43,7 @@ export default async function AuditPage({
 
       <section
         aria-labelledby="audit-list-title"
-        className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]"
+        className="overflow-hidden rounded-xl bg-card shadow-card"
       >
         <div className="border-b border-border/70 px-5 py-4">
           <h2 id="audit-list-title" className="font-semibold">

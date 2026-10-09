@@ -38,7 +38,7 @@ export function UserList({
   return (
     <section
       aria-labelledby="user-list-title"
-      className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]"
+      className="overflow-hidden rounded-xl bg-card shadow-card"
     >
       <div className="border-b border-border/70 px-5 py-4">
         <h2 id="user-list-title" className="font-semibold">账号列表</h2>

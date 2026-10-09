@@ -5,6 +5,7 @@ import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { writeAuditLog, type WriteAuditLogInput } from "@/lib/audit/persistence";
 import { SYSTEM_ADMIN_ROLE_KEY } from "./constants";
 import { hasSystemAdminRole, parseRoleKeys } from "./role-keys";
+import { deriveStandardActions } from "./standard-actions";
 import { canBeDefaultRole, isValidMenuNode, isValidRoleKey } from "./validate";
 
 export class RbacError extends Error {
@@ -304,11 +305,18 @@ async function assertPermissionKeyAvailable(tx: Transaction, permissionKey: stri
   }
 }
 
-export async function createMenu(input: MenuNodeInput, audit: WriteAuditLogInput) {
+export async function createMenu(
+  input: MenuNodeInput,
+  audit: WriteAuditLogInput,
+  options: { standardActions?: readonly string[] } = {},
+) {
   const values = normalizeMenuInput(input);
   if (!values.title) {
     throw new RbacError("invalid_input");
   }
+  const standardActions = input.type === "page"
+    ? deriveStandardActions(values.permissionKey, options.standardActions ?? [])
+    : [];
 
   return db.transaction(async (tx) => {
     // Tree writes are rare. Serializing them prevents two concurrent
@@ -324,6 +332,38 @@ export async function createMenu(input: MenuNodeInput, audit: WriteAuditLogInput
     const id = crypto.randomUUID();
     await tx.insert(menu).values({ id, type: input.type, ...values, isSystem: false });
     await writeAuditLog({ ...audit, resourceId: id }, tx);
+
+    // Optional quick-create: operation nodes under the new page. Keys already
+    // used elsewhere are skipped so the page itself can still be created.
+    for (const item of standardActions) {
+      const [taken] = await tx
+        .select({ id: menu.id })
+        .from(menu)
+        .where(eq(menu.permissionKey, item.permissionKey))
+        .limit(1);
+      if (taken) {
+        continue;
+      }
+      const actionId = crypto.randomUUID();
+      await tx.insert(menu).values({
+        id: actionId,
+        parentId: id,
+        type: "action",
+        title: item.title,
+        href: "",
+        icon: null,
+        sortOrder: item.sortOrder,
+        permissionKey: item.permissionKey,
+        isVisible: true,
+        isSystem: false,
+      });
+      await writeAuditLog({
+        ...audit,
+        resourceId: actionId,
+        summary: `创建菜单节点 ${item.title}（${item.permissionKey}）`,
+        metadata: { type: "action", permissionKey: item.permissionKey, parentId: id },
+      }, tx);
+    }
     return id;
   });
 }

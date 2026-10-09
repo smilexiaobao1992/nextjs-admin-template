@@ -37,7 +37,7 @@ export function StatusNotice({
       className={
         isError
           ? "rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          : "rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]"
+          : "rounded-lg bg-card px-4 py-3 text-sm shadow-soft"
       }
     >
       {messages[notice]}

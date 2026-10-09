@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { Activity, ShieldCheck, Users, UserRoundCog } from "lucide-react";
-import { requirePermission } from "@/lib/auth/session";
+import { PageHeader } from "@/components/layout/page-header";
+import { can, requirePermission } from "@/lib/auth/session";
 import { getDashboardStats } from "@/features/dashboard/queries";
 import { listRecentUsers } from "@/features/users/queries";
-import { isSystemAdminRole, listAllRoles, listPermissionKeysForRoleKey } from "@/lib/rbac/permissions";
+import { listAllRoles } from "@/lib/rbac/permissions";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
 import { formatDate } from "@/lib/utils";
 
 export default async function AppPage() {
   const session = await requirePermission("dashboard:view");
-  const roleKey = session.user.role ?? "";
-  const permissionKeys = await listPermissionKeysForRoleKey(roleKey);
-  const isAdmin = isSystemAdminRole(roleKey);
-  const canReadUsers = isAdmin || permissionKeys.has("users:read");
-  const canReadRoles = isAdmin || permissionKeys.has("roles:read");
-  const canReadAudit = isAdmin || permissionKeys.has("audit:read");
+  const [canReadUsers, canReadRoles, canReadAudit] = await Promise.all([
+    can(session, "users:read"),
+    can(session, "roles:read"),
+    can(session, "audit:read"),
+  ]);
 
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 7);
@@ -46,13 +46,11 @@ export default async function AppPage() {
 
   return (
     <div className="space-y-7">
-      <div className="max-w-2xl">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">工作台</p>
-        <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em] sm:text-4xl">欢迎使用管理中心</h1>
-        <p className="mt-3 text-pretty text-muted-foreground">
-          以下为当前环境的真实聚合数据。通过左侧导航进入可用模块，系统会根据你的角色显示对应功能。
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="工作台"
+        title="欢迎使用管理中心"
+        description="以下为当前环境的真实聚合数据。通过左侧导航进入可用模块，系统会根据你的角色显示对应功能。"
+      />
 
       {stats.length > 0 ? <section aria-labelledby="workspace-stats-title">
         <h2 id="workspace-stats-title" className="text-lg font-semibold tracking-[-0.012em]">
@@ -63,7 +61,7 @@ export default async function AppPage() {
             <Link
               key={item.label}
               href={item.href}
-              className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] transition-[transform,box-shadow] hover:shadow-[0_1px_2px_rgba(62,47,35,0.08),0_14px_32px_rgba(62,47,35,0.12)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-xl bg-card p-5 shadow-card transition-[transform,box-shadow] hover:shadow-card-raised active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <p className="text-sm text-muted-foreground">{item.label}</p>
               <p className="mt-2 text-3xl font-semibold tabular-nums tracking-[-0.022em]">{item.value}</p>
@@ -74,7 +72,7 @@ export default async function AppPage() {
       </section> : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        {canReadUsers ? <div className="rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+        {canReadUsers ? <div className="rounded-xl bg-card shadow-card">
           <div className="border-b border-border/70 px-5 py-4">
             <h2 id="recent-users-title" className="font-semibold">
               最近创建的账号
@@ -110,7 +108,7 @@ export default async function AppPage() {
           <h2 id="workspace-guide-title" className="text-lg font-semibold tracking-[-0.012em]">
             使用提示
           </h2>
-          <div className="mt-4 divide-y divide-border/70 rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]">
+          <div className="mt-4 divide-y divide-border/70 rounded-xl bg-card shadow-card">
             {[
               { icon: ShieldCheck, title: "权限范围", detail: "可见菜单和操作由角色决定，如需调整请联系系统管理员。" },
               { icon: UserRoundCog, title: "账号安全", detail: "可在「个人中心」修改密码并管理本人会话；管理员可封禁或重置他人密码。" },

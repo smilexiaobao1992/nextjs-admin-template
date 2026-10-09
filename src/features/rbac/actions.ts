@@ -129,7 +129,7 @@ export async function createMenuAction(formData: FormData) {
       resourceType: "menu",
       summary: `创建菜单节点 ${fields.title.trim()}${fields.permissionKey ? `（${fields.permissionKey}）` : ""}`,
       metadata: { type, permissionKey: fields.permissionKey },
-    }));
+    }), { standardActions: formData.getAll("standardActions").map(String) });
   } catch (error) {
     redirect(`${retryHref}&notice=${noticeFor(error)}`);
   }

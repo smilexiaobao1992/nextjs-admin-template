@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { Plus, Shield, ShieldCheck } from "lucide-react";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { GuardedDirectoryLink, GuardedEditForm } from "@/components/ui/guarded-edit-form";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
-import { requirePermission } from "@/lib/auth/session";
+import { can, requirePermission } from "@/lib/auth/session";
 import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { SYSTEM_ADMIN_ROLE_KEY } from "@/lib/rbac/constants";
 import { MenuGrantTree, type GrantTreeNode } from "@/features/rbac/components/menu-grant-tree";
@@ -15,7 +16,6 @@ import {
   listAllMenus,
   listAllRoles,
   listMenuIdsByRole,
-  roleHasPermission,
 } from "@/lib/rbac/permissions";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,7 @@ export default async function RolesPage({
     listAllRoles(),
     listAllMenus(),
     listMenuIdsByRole(),
-    roleHasPermission(roleKey, "roles:write"),
+    can(session, "roles:write"),
   ]);
   const selectedRole = roles.find((item) => item.id === selectedId) ?? roles[0] ?? null;
   const createMode = canWrite && mode === "create";
@@ -60,22 +60,20 @@ export default async function RolesPage({
 
   return (
     <div className="space-y-7">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">角色</p>
-        <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">角色管理</h1>
-        <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          为不同岗位设置菜单和操作权限。系统管理员始终拥有全部权限。
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="角色"
+        title="角色管理"
+        description="为不同岗位设置菜单和操作权限。系统管理员始终拥有全部权限。"
+      />
 
       {notice && rbacNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-soft">
           {rbacNoticeMessages[notice]}
         </p>
       ) : null}
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] lg:sticky lg:top-24">
+        <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">角色列表</h2>
@@ -122,7 +120,7 @@ export default async function RolesPage({
         <section
           key={createMode ? "create" : selectedRole?.id ?? "empty"}
           id="rbac-detail"
-          className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
+          className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-card sm:p-6"
         >
           {createMode ? (
             <>

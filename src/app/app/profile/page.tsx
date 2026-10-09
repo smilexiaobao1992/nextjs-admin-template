@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,17 +33,17 @@ export default async function ProfilePage({
 
   return (
     <div className="space-y-7">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">账号</p>
-        <h1 className="text-3xl font-semibold tracking-[-0.022em]">个人中心</h1>
-        <p className="mt-2 text-sm text-muted-foreground">修改密码，并管理当前账号的登录会话。</p>
-      </div>
+      <PageHeader
+        eyebrow="账号"
+        title="个人中心"
+        description="修改密码，并管理当前账号的登录会话。"
+      />
 
       <StatusNotice notice={notice} messages={profileNoticeMessages} />
 
       <section
         aria-labelledby="profile-info-title"
-        className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
+        className="rounded-xl bg-card p-5 shadow-card sm:p-6"
       >
         <h2 id="profile-info-title" className="font-semibold">
           基本信息
@@ -67,7 +68,7 @@ export default async function ProfilePage({
 
       <section
         aria-labelledby="change-password-title"
-        className="rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
+        className="rounded-xl bg-card p-5 shadow-card sm:p-6"
       >
         <h2 id="change-password-title" className="font-semibold">
           修改密码
@@ -116,7 +117,7 @@ export default async function ProfilePage({
 
       <section
         aria-labelledby="sessions-title"
-        className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)]"
+        className="overflow-hidden rounded-xl bg-card shadow-card"
       >
         <div className="border-b border-border/70 px-5 py-4">
           <h2 id="sessions-title" className="font-semibold">

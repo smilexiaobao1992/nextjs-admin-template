@@ -29,14 +29,14 @@
 - 在用户管理弹窗中调整角色、封禁账号、重置密码和撤销会话。
 - 菜单与权限合并为一棵树（目录 / 页面 / 操作），角色授权在同一棵树上勾选，服务端同步校验授权范围。
 - 工作台展示真实的用户、角色、会话与审计统计，列表支持搜索和分页。
-- 两套响应式主题，登录页使用 GSAP 动效，并遵循系统的“减少动态效果”设置。
+- 两套响应式主题，登录页使用 Canvas 动效，并遵循系统的“减少动态效果”设置。
 
 ## 技术栈
 
 - Next.js 16.3、React 19.2、TypeScript、Tailwind CSS 4
 - Better Auth 1.6，邮箱密码登录与 Admin 插件
 - Drizzle ORM、PostgreSQL，适配 Supabase 与 Vercel
-- GSAP、Vitest、Testing Library、ESLint、GitHub Actions
+- Zod、Vitest、Testing Library、ESLint、GitHub Actions
 - Docker Compose 本地 PostgreSQL 17
 
 ## 已实现的安全边界
@@ -63,39 +63,32 @@
 
 ## 本地启动
 
+### 方式一：一键快速初始化（推荐）
+
 ```bash
 git clone https://github.com/smilexiaobao1992/nextjs-admin-template.git
 cd nextjs-admin-template
 npm ci
-cp .env.example .env.local
-```
-
-首次启动数据库前编辑 `.env.local`（若使用仓库自带 Compose，默认值可直接使用）：
-
-```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
-DIRECT_DATABASE_URL=postgresql://postgres:password@localhost:5432/admin_template
-BETTER_AUTH_SECRET=change-me
-BETTER_AUTH_URL=http://localhost:3002
-```
-
-先运行 `openssl rand -base64 32`，用输出替换 `change-me`；占位值会被启动校验明确拒绝。如果修改 `POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB` 或 `POSTGRES_PORT`，需要同步更新两个数据库连接地址。
-
-然后启动 PostgreSQL。Compose 会显式读取 `.env.local`，并只将数据库端口绑定到 `127.0.0.1`：
-
-```bash
-docker compose --env-file .env.local up -d   # 或 npm run db:up
-```
-
-数据库健康后执行：
-
-```bash
-npm run db:migrate
+npm run setup
 npm run admin:create
 npm run dev
 ```
 
-浏览器打开 [http://localhost:3002](http://localhost:3002)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。
+`npm run setup` 会自动从模板创建 `.env.local`、生成安全的随机密钥、启动本地 Docker PostgreSQL 并自动运行迁移与基线验证。
+
+### 方式二：手动配置
+
+1. 复制配置文件：`cp .env.example .env.local`。
+2. 运行 `openssl rand -base64 32`，将其填入 `.env.local` 中的 `BETTER_AUTH_SECRET`。
+3. 启动本地数据库：`npm run db:up`（或连接自己的 PostgreSQL / Supabase 实例）。
+4. 运行迁移与账号创建：
+   ```bash
+   npm run db:migrate
+   npm run admin:create
+   npm run dev
+   ```
+
+浏览器打开 [http://localhost:3002](http://localhost:3002)。`admin:create` 会在交互式终端中读取密码，不接受命令行密码参数。可通过 `npm run db:seed` 填充演示账号和操作数据。
 
 部署健康检查：`GET /api/health`（检查数据库连通性，不暴露密钥）。
 
@@ -130,6 +123,8 @@ alter default privileges for role postgres in schema public
 | `npm run dev` | 启动开发服务器 |
 | `npm run check` | lint、类型检查和测试 |
 | `npm run build` | 生产构建 |
+| `npm run setup` | 一键初始化（环境配置、启动数据库容器、迁移与校验） |
+| `npm run db:seed` | 填充开发环境演示用户与审计日志 |
 | `npm run db:up` / `db:down` | 启动 / 停止本地 Postgres（Docker Compose） |
 | `npm run db:generate` | 根据 schema 生成迁移 |
 | `npm run db:migrate` | 执行已提交迁移 |
@@ -137,7 +132,7 @@ alter default privileges for role postgres in schema public
 | `npm run db:verify:security` | 验证越权防护与审计事务原子性 |
 | `npm run db:studio` | 打开 Drizzle Studio |
 | `npm run admin:create` | 交互式创建管理员 |
-| `npm run scaffold:feature -- <name>` | 生成 feature 与页面骨架 |
+| `npm run scaffold:feature -- <name>` | 生成完整可运行的 CRUD feature 与页面骨架 |
 
 ## 路由
 
@@ -160,23 +155,29 @@ alter default privileges for role postgres in schema public
 ```text
 src/
   app/                         # Next.js 路由与页面组装（尽量薄）
+    global-error.tsx           # 全局兜底错误边界
     login/
     app/                       # 受保护壳下的页面
-      page.tsx
-      users/page.tsx
-      audit/page.tsx
-      profile/page.tsx
+      loading.tsx              # 加载骨架屏
+      error.tsx                # 应用级错误重试
+      page.tsx                 # 工作台
+      users/page.tsx           # 用户管理
+      roles/page.tsx           # 角色管理
+      menus/page.tsx           # 菜单与权限管理
+      audit/page.tsx           # 审计日志
+      profile/page.tsx         # 个人中心
     api/auth/[...all]/
     api/health/
   features/                    # 业务域（复制后主要加这里）
     dashboard/                 # 工作台统计查询
-    users/
+    users/                     # 用户域
     rbac/                      # 角色 / 菜单与权限 Server Actions 与授权树组件
   components/
-    ui/                        # 含列表搜索、分页、状态提示
-    layout/                    # AppShell 接收服务端过滤后的 menus
+    ui/                        # 基础 UI（含列表搜索、分页、状态提示、确认弹窗）
+    layout/                    # AppShell, PageHeader, Sidebar, Header
   lib/
-    auth/                      # 会话、requirePermission、用户生命周期
+    actions/                   # Server Action 管道（defineAction, zod 表单解析）
+    auth/                      # 会话、requirePermission、can 辅助、用户生命周期
     admin-theme.ts             # 主题解析与默认值
     audit/                     # 审计写入与查询
     list/                      # 列表分页/搜索参数约定
@@ -188,12 +189,13 @@ src/
 
 扩展建议：
 
-1. **新业务页**：`npm run scaffold:feature -- orders`，或手动建 `src/features/<domain>/` + `src/app/app/<route>/page.tsx`。
-2. **注册权限**：在「菜单与权限」新增页面节点（路径 `/app/orders`，key `orders:read`），再在它下面新增操作节点（如 `orders:write`、`orders:export`）；到「角色」勾选授权；代码中调用 `requirePermission("orders:read")`。页面 key 留空表示所有登录用户可见。
-3. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
-4. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查是安全层。
-5. 关键写操作与 `writeAuditLog` 必须使用同一个数据库事务。
-6. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
+1. **新业务模块**：`npm run scaffold:feature -- orders`，将自动生成带增删改查弹窗、表格、分页搜索、审计日志与测试的完整功能域和页面。
+2. **在后台注册权限**：在「菜单与权限」新增页面节点（路径 `/app/orders`，key `orders:read`），勾选「同时创建操作节点」会自动生成 `orders:create`、`orders:update`、`orders:delete`；再前往「角色」勾选授权。
+3. **编写业务 Action**：使用 `defineAction` 包装 Server Action，一行配置声明权限、zod 表单校验规则与事务内审计写入。
+4. **新表**：改 `src/lib/db/schema.ts` → `npm run db:generate` → 审查 SQL → `db:migrate`。
+5. **不要**只靠隐藏菜单做授权；菜单是体验层，服务端权限检查（`requirePermission`）是安全层。
+6. 关键写操作与 `writeAuditLog` 必须使用同一个数据库事务。
+7. UI 变更遵循 [docs/ui-guidelines.md](docs/ui-guidelines.md)。
 
 ## 路线图
 

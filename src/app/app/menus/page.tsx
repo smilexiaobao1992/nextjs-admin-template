@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { FileText, Folder, KeyRound, ListTree, Plus } from "lucide-react";
 import { MENU_ICON_OPTIONS } from "@/components/layout/menu-icons";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -8,9 +9,10 @@ import { Select } from "@/components/ui/select";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createMenuAction, deleteMenuAction, updateMenuAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
-import { requirePermission } from "@/lib/auth/session";
+import { can, requirePermission } from "@/lib/auth/session";
 import { MENU_NODE_TYPES, type MenuNodeType } from "@/lib/db/schema";
-import { listAllMenus, roleHasPermission, type MenuNode } from "@/lib/rbac/permissions";
+import { listAllMenus, type MenuNode } from "@/lib/rbac/permissions";
+import { DEFAULT_STANDARD_ACTION_VERBS, STANDARD_ACTIONS } from "@/lib/rbac/standard-actions";
 import { cn } from "@/lib/utils";
 
 const TYPE_META: Record<MenuNodeType, { label: string; icon: typeof Folder; hint: string }> = {
@@ -52,7 +54,7 @@ export default async function MenusPage({
   const params = await searchParams;
   const [nodes, canWrite] = await Promise.all([
     listAllMenus(),
-    roleHasPermission(session.user.role ?? "", "menus:write"),
+    can(session, "menus:write"),
   ]);
   const byId = new Map(nodes.map((item) => [item.id, item]));
   const childrenOf = (parentId: string | null) => nodes.filter((item) => item.parentId === parentId).sort(byOrder);
@@ -92,22 +94,20 @@ export default async function MenusPage({
 
   return (
     <div className="space-y-7">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">菜单与权限</p>
-        <h1 className="text-balance text-3xl font-semibold tracking-[-0.022em]">菜单与权限</h1>
-        <p className="mt-2 text-pretty text-sm text-muted-foreground">
-          在一棵树里维护侧栏菜单和权限点：目录用于分组，页面是侧栏入口，操作是页面内的按钮权限。建好后到「角色」中勾选授权。
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="菜单与权限"
+        title="菜单与权限"
+        description="在一棵树里维护侧栏菜单和权限点：目录用于分组，页面是侧栏入口，操作是页面内的按钮权限。建好后到「角色」中勾选授权。"
+      />
 
       {params.notice && rbacNoticeMessages[params.notice] ? (
-        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-[0_1px_2px_rgba(62,47,35,0.06),0_8px_22px_rgba(62,47,35,0.07)]">
+        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-soft">
           {rbacNoticeMessages[params.notice]}
         </p>
       ) : null}
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] lg:sticky lg:top-24">
+        <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">结构</h2>
@@ -147,7 +147,7 @@ export default async function MenusPage({
         <section
           key={createMode ? `create-${createType}-${params.parent ?? ""}` : selected?.id ?? "empty"}
           id="rbac-detail"
-          className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-[0_1px_2px_rgba(62,47,35,0.06),0_10px_28px_rgba(62,47,35,0.09)] sm:p-6"
+          className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-card sm:p-6"
         >
           {createMode ? (
             <>
@@ -336,6 +336,29 @@ function MenuNodeForm({
           <input type="hidden" name="href" value={node?.href ?? ""} />
           <input type="hidden" name="permissionKey" value={node?.permissionKey ?? ""} />
         </>
+      ) : null}
+
+      {!node && type === "page" ? (
+        <fieldset className="space-y-2 rounded-lg border border-border/70 p-4">
+          <legend className="px-1 text-sm font-medium">同时创建操作节点</legend>
+          <p className="text-xs text-muted-foreground">
+            根据页面权限 key 自动生成，例如 orders:read → orders:create / orders:update。未填写权限 key 时忽略；已存在的 key 会跳过。
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1">
+            {STANDARD_ACTIONS.map((item) => (
+              <label key={item.verb} className="flex min-h-9 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="standardActions"
+                  value={item.verb}
+                  defaultChecked={DEFAULT_STANDARD_ACTION_VERBS.includes(item.verb)}
+                />
+                {item.title}
+                <span className="font-mono text-[11px] text-muted-foreground">:{item.verb}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
