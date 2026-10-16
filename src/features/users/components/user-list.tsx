@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -87,13 +88,9 @@ export function UserList({
                   </TableCell>
                   <TableCell>
                     {item.banned ? (
-                      <span className="inline-flex rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
-                        已封禁
-                      </span>
+                      <Badge variant="destructive">已封禁</Badge>
                     ) : (
-                      <span className="inline-flex rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                        正常
-                      </span>
+                      <Badge variant="success">正常</Badge>
                     )}
                     {item.banned && item.banReason ? (
                       <p className="mt-1 max-w-40 truncate text-xs text-muted-foreground" title={item.banReason}>

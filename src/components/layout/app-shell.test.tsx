@@ -97,6 +97,10 @@ describe("app shell", () => {
     expect(screen.getByRole("link", { name: "用户" })).toHaveAttribute("href", "/app/users");
     expect(screen.getByRole("link", { name: "角色" })).toHaveAttribute("href", "/app/roles");
 
+    const breadcrumbNav = screen.getByRole("navigation", { name: "面包屑" });
+    expect(breadcrumbNav).toHaveTextContent("系统设置");
+    expect(breadcrumbNav).toHaveTextContent("用户");
+
     fireEvent.click(settingsToggle);
     expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: "用户" })).not.toBeInTheDocument();
@@ -130,5 +134,31 @@ describe("app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
 
     expect(screen.getByRole("link", { name: "系统设置" })).toHaveAttribute("href", "/app/users");
+  });
+
+  it("prioritizes exact menu href match in breadcrumb trail", () => {
+    render(
+      <AppShell
+        user={{ name: "管理员", email: "admin@example.com", role: "admin" }}
+        menus={[
+          { id: "m-root", title: "应用中心", href: "/app", icon: "LayoutDashboard" },
+          {
+            id: "settings",
+            title: "权限与安全",
+            href: "",
+            icon: "Settings",
+            children: [
+              { id: "m-users", title: "账号中心", href: "/app/users", icon: "Users" },
+            ],
+          },
+        ]}
+      >
+        <p>页面内容</p>
+      </AppShell>,
+    );
+
+    const breadcrumbNav = screen.getByRole("navigation", { name: "面包屑" });
+    expect(breadcrumbNav).toHaveTextContent("权限与安全");
+    expect(breadcrumbNav).toHaveTextContent("账号中心");
   });
 });

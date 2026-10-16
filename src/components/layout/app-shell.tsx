@@ -72,6 +72,7 @@ export default function AppShell({
       <div className={cn("admin-workspace min-h-screen bg-background", collapsed ? "md:pl-20" : "md:pl-64")}>
         <UserHeader
           user={user}
+          menus={menus}
           onOpenNavigation={() => setMobileOpen(true)}
           theme={theme}
           onThemeChange={changeTheme}

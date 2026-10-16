@@ -222,6 +222,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Textarea } from "@/components/ui/textarea";
 import { create${pascal}Action, update${pascal}Action } from "../actions";
 import type { ${pascal}Item } from "../queries";
 
@@ -286,7 +287,7 @@ export function ${pascal}Dialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="${feature}-desc">描述</Label>
-              <Input
+              <Textarea
                 id="${feature}-desc"
                 name="description"
                 defaultValue={item?.description ?? ""}

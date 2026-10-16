@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect } from "react";
+import { toast } from "sonner";
+
 const SUCCESS_NOTICES = new Set([
   "created",
   "updated",
@@ -19,11 +24,31 @@ export function StatusNotice({
   notice?: string;
   messages: Record<string, string>;
 }) {
-  if (!notice || !messages[notice]) {
+  const message = notice ? messages[notice] : undefined;
+  const isError = notice ? !SUCCESS_NOTICES.has(notice) : false;
+
+  useEffect(() => {
+    if (!notice || !message) {
+      return;
+    }
+
+    if (isError) {
+      toast.error(message, { id: `notice:${notice}` });
+    } else {
+      toast.success(message, { id: `notice:${notice}` });
+    }
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("notice")) {
+      url.searchParams.delete("notice");
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
+  }, [isError, message, notice]);
+
+  if (!notice || !message) {
     return null;
   }
-
-  const isError = !SUCCESS_NOTICES.has(notice);
 
   return (
     <p
@@ -34,7 +59,7 @@ export function StatusNotice({
           : "rounded-lg bg-card px-4 py-3 text-sm shadow-soft"
       }
     >
-      {messages[notice]}
+      {message}
     </p>
   );
 }

@@ -23,8 +23,8 @@
 - 卡片只用于需要独立边界的表单或数据组；普通说明优先使用无卡片结构。面板使用背景阶差和一组分层阴影，不要让每个区块都同时出现边框与阴影。
 - 按钮按下使用轻微 `scale(0.95)`，其他状态只改变颜色、背景或边框。
 - 表单必须提供可见 label、name、autocomplete、服务端校验和可读错误。
-- 下拉框使用 `components/ui/select`，高度、边框和 focus 环与 `Input` 一致，不要在页面里手写一套原生样式。
-- Server Action 提交按钮使用 `components/ui/submit-button`，展示 pending 状态；列表为空时提供 empty state 与下一步操作提示。
+- 优先复用 `src/components/ui/` 标准原语：`Button`、`Input`、`Textarea`、`Select`、`Checkbox`、`Switch`、`Badge`、`Tabs`、`DropdownMenu`、`Dialog`、`Table`，不要在页面里手写散落的原生控件样式。
+- Server Action 提交按钮使用 `components/ui/submit-button`（破坏性二次确认使用 `components/ui/confirm-submit-button`）；操作反馈统一使用 `components/ui/status-notice`（兼顾无障碍状态条、Sonner 浮层提示与 URL `?notice=` 参数自动清理）。列表为空时提供 empty state 与下一步操作提示。
 
 ## 5. Layout
 

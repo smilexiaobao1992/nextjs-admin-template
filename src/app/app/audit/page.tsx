@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import {
@@ -80,7 +81,11 @@ export default async function AuditPage({
                   <TableCell className="max-w-40 truncate text-sm">
                     {item.actorEmail ?? "—"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{item.action}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="font-mono">
+                      {item.action}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="max-w-72 text-sm">{item.summary}</TableCell>
                   <TableCell className="max-w-40 truncate font-mono text-xs text-muted-foreground">
                     {item.resourceType}

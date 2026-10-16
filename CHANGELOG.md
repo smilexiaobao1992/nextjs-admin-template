@@ -6,6 +6,11 @@ Notable changes to this template are documented here. This project follows seman
 
 ### Added
 
+- **Base UI Component Primitives**: Added `Textarea`, `Badge`, `Checkbox`, `Switch`, `Tabs`, and `DropdownMenu` in `src/components/ui/` built on Radix UI and CVA, with unit test coverage.
+- **Toast & Clean URL Feedback**: Connected `StatusNotice` with `sonner` toast notifications and automatic `?notice=` URL parameter cleanup via `window.history.replaceState` while preserving accessible `role="status"` / `role="alert"` banners.
+- **Dynamic Header Breadcrumbs**: Added automatic breadcrumb trail resolution in `UserHeader` derived from the active route and dynamic RBAC menu tree.
+- **Standalone Docker Deployment**: Enabled `output: "standalone"` in `next.config.ts` and added a multi-stage production `Dockerfile` (`node:24-alpine`, non-root user, `/api/health` healthcheck) and `.dockerignore`.
+- **AI Agent Coding Conventions**: Documented project architecture, security invariants, and coding constraints in `AGENTS.md` (imported by `CLAUDE.md`).
 - **Dynamic Menu Standard Actions**: Batch creation of standard CRUD action permission nodes (`view`, `create`, `update`, `delete`, `export`) directly when creating a page node in the Menu Management UI, eliminating manual entry while preserving dynamic database-backed permissions.
 - **Zod & defineAction Pipeline**: Introduced `defineAction` pipeline with schema-driven validation, form data parsing (`formDataToObject`, `parseFormData`), permission enforcement via `can()`, atomic audit logging, search notice parameter redirects (`withNotice`), and Next.js 16 `unstable_rethrow` redirect safety.
 - **Production CRUD Scaffolder**: Rewrote `scripts/scaffold-feature.ts` into a complete code generator producing schemas, paginated queries, search filters, dialog modal forms, delete confirmations, typed Server Actions, and Vitest test suites.

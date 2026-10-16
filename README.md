@@ -116,6 +116,24 @@ alter default privileges for role postgres in schema public
 
 不要在生产部署启动阶段自动执行 `db:push`。生产 schema 变更应先生成迁移、审查 SQL，再运行 `db:migrate`。
 
+## Docker 容器化部署（自托管）
+
+项目已启用 Next.js `output: "standalone"` 并提供多阶段 `Dockerfile`（基于 `node:24-alpine` 非 root 用户运行，内置 `/api/health` 健康检查）：
+
+```bash
+# 1. 构建轻量生产镜像
+docker build -t nextjs-admin-template .
+
+# 2. 传入生产环境变量启动容器（监听 3002 端口）
+docker run -d \
+  --name nextjs-admin \
+  -p 3002:3002 \
+  -e DATABASE_URL="postgres://user:pass@host:5432/dbname" \
+  -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+  -e BETTER_AUTH_URL="https://admin.example.com" \
+  nextjs-admin-template
+```
+
 ## 常用命令
 
 | 命令 | 用途 |
@@ -173,8 +191,8 @@ src/
     users/                     # 用户域
     rbac/                      # 角色 / 菜单与权限 Server Actions 与授权树组件
   components/
-    ui/                        # 基础 UI（含列表搜索、分页、状态提示、确认弹窗）
-    layout/                    # AppShell, PageHeader, Sidebar, Header
+    ui/                        # 基础 UI（Button, Input, Textarea, Select, Checkbox, Switch, Badge, Tabs, DropdownMenu, Dialog, Table 等）
+    layout/                    # AppShell, PageHeader, Sidebar, UserHeader（含动态面包屑）
   lib/
     actions/                   # Server Action 管道（defineAction, zod 表单解析）
     auth/                      # 会话、requirePermission、can 辅助、用户生命周期
@@ -218,7 +236,10 @@ src/
 
 - ✅ feature 脚手架 `npm run scaffold:feature`
 - ✅ OAuth / 2FA / 邮件重置说明文档
-- ✅ 状态提示组件统一（`StatusNotice`）
+- ✅ 状态提示组件统一（`StatusNotice` + Sonner Toast + URL 参数自动清理）
+- ✅ 面包屑 / 页面标题壳层约定（根据动态菜单树与当前路径自动推导）
+- ✅ 高频基础 UI 原语库（`Badge` / `Textarea` / `Checkbox` / `Switch` / `Tabs` / `DropdownMenu`）
+- ✅ Docker Standalone 多阶段容器化生产部署
 
 ### 开源侧
 
@@ -226,11 +247,11 @@ src/
 - ✅ Issue / PR 模板
 - ✅ README 路线图与命令说明
 - ✅ CHANGELOG
+- ✅ AI Agent 协作规范（`AGENTS.md` / `CLAUDE.md`）
 
 ### 后续可选（未排期）
 
 - ⬜ 文案 key 化，便于 fork 接入 i18n
-- ⬜ 面包屑 / 页面标题壳层约定
 - ⬜ 更丰富的 DataTable（排序、列显隐）骨架
 - ⬜ 发布版本标签与自动化发布流程
 
