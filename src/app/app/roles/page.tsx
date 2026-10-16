@@ -4,6 +4,7 @@ import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { GuardedDirectoryLink, GuardedEditForm } from "@/components/ui/guarded-edit-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
@@ -66,11 +67,7 @@ export default async function RolesPage({
         description="为不同岗位设置菜单和操作权限。系统管理员始终拥有全部权限。"
       />
 
-      {notice && rbacNoticeMessages[notice] ? (
-        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-soft">
-          {rbacNoticeMessages[notice]}
-        </p>
-      ) : null}
+      <StatusNotice notice={notice} messages={rbacNoticeMessages} />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
         <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">
@@ -98,9 +95,9 @@ export default async function RolesPage({
                   key={item.id}
                   href={`/app/roles?selected=${encodeURIComponent(item.id)}#rbac-detail`}
                   className={cn(
-                    "flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-3 py-2 transition-[background-color,color,box-shadow,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-12 min-w-0 items-center gap-3 rounded-lg px-3 py-2 transition-[background-color,color,transform] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     !createMode && selectedRole?.id === item.id
-                      ? "bg-primary text-primary-foreground shadow-[0_7px_18px_rgba(126,47,24,0.2)]"
+                      ? "bg-primary text-primary-foreground"
                       : "hover:bg-secondary/75 hover:text-secondary-foreground",
                   )}
                 >

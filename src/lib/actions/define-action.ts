@@ -86,9 +86,6 @@ export function defineAction<S extends z.ZodType, Result = void>(config: DefineA
     } catch (error) {
       unstable_rethrow(error);
       const code = error instanceof ActionError ? error.code : config.mapError?.(error) ?? null;
-      if (!code) {
-        console.error("[defineAction] unexpected error", error);
-      }
       redirect(withNotice(fallback, code ?? "failed"));
     }
 

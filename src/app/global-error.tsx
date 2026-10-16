@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 export default function GlobalError({
   error,
   retry,
@@ -11,10 +9,6 @@ export default function GlobalError({
   retry?: () => void;
   reset?: () => void;
 }) {
-  useEffect(() => {
-    console.error("[GlobalError]", error);
-  }, [error]);
-
   const handleRetry = () => {
     if (typeof retry === "function") {
       retry();

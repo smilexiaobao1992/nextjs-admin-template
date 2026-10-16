@@ -6,6 +6,7 @@ import { GuardedDirectoryLink, GuardedEditForm } from "@/components/ui/guarded-e
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createMenuAction, deleteMenuAction, updateMenuAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
@@ -100,11 +101,7 @@ export default async function MenusPage({
         description="在一棵树里维护侧栏菜单和权限点：目录用于分组，页面是侧栏入口，操作是页面内的按钮权限。建好后到「角色」中勾选授权。"
       />
 
-      {params.notice && rbacNoticeMessages[params.notice] ? (
-        <p role="status" className="rounded-lg bg-card px-4 py-3 text-sm shadow-soft">
-          {rbacNoticeMessages[params.notice]}
-        </p>
-      ) : null}
+      <StatusNotice notice={params.notice} messages={rbacNoticeMessages} />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
         <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">

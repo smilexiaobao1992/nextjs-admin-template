@@ -1,21 +1,15 @@
-const ERROR_NOTICES = new Set([
-  "failed",
-  "invalid_input",
-  "email_taken",
-  "last_admin",
-  "not_found",
-  "invalid_role",
-  "system_role_forbidden",
-  "role_scope_forbidden",
-  "self_forbidden",
-  "wrong_password",
-  "no_credential",
-  "password_mismatch",
-  "duplicate",
-  "system_locked",
-  "in_use",
-  "last_default",
-  "forbidden",
+const SUCCESS_NOTICES = new Set([
+  "created",
+  "updated",
+  "deleted",
+  "saved",
+  "role_updated",
+  "banned",
+  "unbanned",
+  "password_reset",
+  "sessions_revoked",
+  "password_changed",
+  "session_revoked",
 ]);
 
 export function StatusNotice({
@@ -29,7 +23,7 @@ export function StatusNotice({
     return null;
   }
 
-  const isError = ERROR_NOTICES.has(notice);
+  const isError = !SUCCESS_NOTICES.has(notice);
 
   return (
     <p

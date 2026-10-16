@@ -11,6 +11,7 @@ if (process.env.NODE_ENV === "production") {
 const DEMO_PASSWORD = "DemoPassword123!"; // 满足 12 位且含字母与数字的要求
 
 const DEMO_USERS = [
+  { name: "系统管理员", email: "admin@example.com", roles: [SYSTEM_ADMIN_ROLE_KEY] },
   { name: "李运营", email: "operator@example.com", roles: ["member"] },
   { name: "张研发", email: "developer@example.com", roles: ["member"] },
   { name: "王审计", email: "auditor@example.com", roles: ["member"] },

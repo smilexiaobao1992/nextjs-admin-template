@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { AlertCircle, RefreshCw, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,10 +13,6 @@ export default function AppError({
   retry?: () => void;
   reset?: () => void;
 }) {
-  useEffect(() => {
-    console.error("[AppError]", error);
-  }, [error]);
-
   const handleRetry = () => {
     if (typeof retry === "function") {
       retry();
