@@ -110,6 +110,9 @@ export default async function UsersPage({
           defaultQuery={usersPage.q}
           placeholder="按姓名、邮箱或角色搜索"
           label="搜索用户"
+          pageSize={usersPage.pageSize}
+          sort={usersPage.sort}
+          order={usersPage.order}
         />
       </Card>
 

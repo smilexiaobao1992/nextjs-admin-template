@@ -63,15 +63,18 @@ export async function getRecentAuditDailySeries(days = 7): Promise<AuditDailyPoi
   since.setUTCDate(since.getUTCDate() - (days - 1));
   since.setUTCHours(0, 0, 0, 0);
 
-  const rows = await db
-    .select({ createdAt: auditLog.createdAt })
-    .from(auditLog)
-    .where(gte(auditLog.createdAt, since));
+  const rows = await db.execute<{ day: string; count: number }>(sql`
+    select
+      to_char(${auditLog.createdAt} at time zone ${APP_TIME_ZONE}, 'YYYY-MM-DD') as "day",
+      count(*)::int as "count"
+    from ${auditLog}
+    where ${gte(auditLog.createdAt, since)}
+    group by 1
+  `);
 
   const countsByDay = new Map<string, number>();
   for (const row of rows) {
-    const key = formatDayKey(row.createdAt);
-    countsByDay.set(key, (countsByDay.get(key) ?? 0) + 1);
+    countsByDay.set(row.day, Number(row.count));
   }
 
   const series: AuditDailyPoint[] = [];

@@ -66,6 +66,9 @@ export default async function AuditPage({
           defaultQuery={listQuery.q}
           placeholder="按操作、摘要、操作人或资源搜索"
           label="搜索审计"
+          pageSize={result.pageSize}
+          sort={result.sort}
+          order={result.order}
         />
       </Card>
 

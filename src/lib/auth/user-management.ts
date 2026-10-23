@@ -548,8 +548,9 @@ export async function batchSetUsersBanned({
       throw new UserManagementError("not_found");
     }
 
-    for (const target of targets) {
-      await assertCanManageTargetRoles(tx, actorRoleKey, target.role);
+    const uniqueTargetRoles = new Set(targets.map((target) => target.role));
+    for (const targetRole of uniqueTargetRoles) {
+      await assertCanManageTargetRoles(tx, actorRoleKey, targetRole);
     }
 
     if (banned) {
