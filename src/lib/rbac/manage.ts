@@ -109,14 +109,22 @@ async function replaceRoleMenus(tx: Transaction, roleId: string, menuIds: string
 
 // --- Roles ---
 
+function resolveRoleKey(rawKey?: string): string {
+  const trimmed = (rawKey ?? "").trim().toLowerCase();
+  if (trimmed) {
+    return trimmed;
+  }
+  return `role_${crypto.randomUUID().replace(/-/g, "").slice(0, 10)}`;
+}
+
 export async function createRole(input: {
-  key: string;
+  key?: string;
   name: string;
   description?: string;
   menuIds: string[];
   isDefault?: boolean;
 }, actorRoleKey: string, audit: WriteAuditLogInput) {
-  const key = input.key.trim().toLowerCase();
+  const key = resolveRoleKey(input.key);
   const name = normalizeText(input.name);
   const description = input.description?.trim() || null;
 

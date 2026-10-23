@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { deriveStandardActions } from "./standard-actions";
+import { derivePagePermissionKeyFromHref, deriveStandardActions } from "./standard-actions";
+
+describe("derivePagePermissionKeyFromHref", () => {
+  it("derives resource:read from /app/* routes", () => {
+    expect(derivePagePermissionKeyFromHref("/app/orders")).toBe("orders:read");
+    expect(derivePagePermissionKeyFromHref("/app/inventory-items")).toBe("inventory_items:read");
+    expect(derivePagePermissionKeyFromHref("/app/billing/invoices")).toBe("billing_invoices:read");
+  });
+
+  it("handles root /app as dashboard:view", () => {
+    expect(derivePagePermissionKeyFromHref("/app")).toBe("dashboard:view");
+  });
+});
 
 describe("deriveStandardActions", () => {
   it("derives keys from the page resource in a stable order", () => {

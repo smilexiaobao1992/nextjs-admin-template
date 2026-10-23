@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import {
+  SortableTableHead,
   Table,
   TableBody,
   TableCell,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import type { ListedUser } from "@/features/users/queries";
 import type { Role } from "@/lib/db/schema";
+import type { SortOrder } from "@/lib/list/pagination";
 import { parseRoleKeys } from "@/lib/rbac/role-keys";
 import { formatDate } from "@/lib/utils";
 import { UserManagementDialog } from "./user-management-dialog";
@@ -22,6 +24,10 @@ export function UserList({
   manageableUserIds,
   currentUserId,
   total,
+  q = "",
+  pageSize,
+  sort,
+  order,
 }: {
   users: ListedUser[];
   roles: Role[];
@@ -31,6 +37,10 @@ export function UserList({
   manageableUserIds?: Set<string>;
   currentUserId?: string;
   total: number;
+  q?: string;
+  pageSize?: number;
+  sort?: string;
+  order?: SortOrder;
 }) {
   const roleNameByKey = Object.fromEntries(roles.map((item) => [item.key, item.name]));
   const systemRoleKeys = new Set(roles.filter((item) => item.isSystem).map((item) => item.key));
@@ -59,10 +69,37 @@ export function UserList({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>用户</TableHead>
-              <TableHead>角色</TableHead>
+              <SortableTableHead
+                column="name"
+                currentSort={sort}
+                currentOrder={order}
+                pathname="/app/users"
+                q={q}
+                pageSize={pageSize}
+              >
+                用户
+              </SortableTableHead>
+              <SortableTableHead
+                column="role"
+                currentSort={sort}
+                currentOrder={order}
+                pathname="/app/users"
+                q={q}
+                pageSize={pageSize}
+              >
+                角色
+              </SortableTableHead>
               <TableHead>状态</TableHead>
-              <TableHead>创建时间</TableHead>
+              <SortableTableHead
+                column="createdAt"
+                currentSort={sort}
+                currentOrder={order}
+                pathname="/app/users"
+                q={q}
+                pageSize={pageSize}
+              >
+                创建时间
+              </SortableTableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>

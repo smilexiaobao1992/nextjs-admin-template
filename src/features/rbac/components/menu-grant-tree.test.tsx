@@ -37,7 +37,7 @@ describe("MenuGrantTree", () => {
     await user.click(screen.getByRole("checkbox", { name: /管理用户/ }));
     expect(submittedIds(container)).toEqual(["users", "users-write"]);
 
-    await user.click(screen.getByRole("checkbox", { name: /用户\s*users:read/ }));
+    await user.click(screen.getByRole("checkbox", { name: "用户" }));
     expect(submittedIds(container)).toEqual([]);
 
     await user.click(screen.getByRole("checkbox", { name: "全选系统设置" }));

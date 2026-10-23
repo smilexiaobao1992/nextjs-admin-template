@@ -1,11 +1,13 @@
+import { Download } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import { StatusNotice } from "@/components/ui/status-notice";
 import { CreateUserForm } from "@/features/users/components/create-user-form";
 import { UserList } from "@/features/users/components/user-list";
 import { userNoticeMessages } from "@/features/users/messages";
-import { listUsersPage } from "@/features/users/queries";
+import { listUsersPage, USER_SORT_COLUMNS } from "@/features/users/queries";
 import { can, requirePermission } from "@/lib/auth/session";
 import { canManageRolePermissionSets } from "@/lib/auth/authorization";
 import { parseListQuery } from "@/lib/list/pagination";
@@ -19,11 +21,22 @@ import { parseRoleKeys } from "@/lib/rbac/role-keys";
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ notice?: string; page?: string; q?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    notice?: string;
+    page?: string;
+    q?: string;
+    pageSize?: string;
+    sort?: string;
+    order?: string;
+  }>;
 }) {
   const session = await requirePermission("users:read");
   const params = await searchParams;
-  const listQuery = parseListQuery(params);
+  const listQuery = parseListQuery(params, {
+    sort: "createdAt",
+    order: "asc",
+    allowedSorts: USER_SORT_COLUMNS,
+  });
   const [usersPage, roles, menuIdsByRole] = await Promise.all([
     listUsersPage(listQuery),
     listAllRoles(),
@@ -68,6 +81,9 @@ export default async function UsersPage({
       })
       .map((item) => item.id),
   );
+  const exportHref = usersPage.q
+    ? `/app/users/export?q=${encodeURIComponent(usersPage.q)}`
+    : "/app/users/export";
 
   return (
     <div className="space-y-7">
@@ -75,6 +91,14 @@ export default async function UsersPage({
         eyebrow="用户"
         title="用户管理"
         description="查看系统账号，创建用户、调整角色、封禁账号、重置密码并管理会话。"
+        actions={
+          <Button variant="outline" size="sm" asChild className="gap-1.5">
+            <a href={exportHref} download>
+              <Download aria-hidden="true" className="size-4" />
+              导出 CSV
+            </a>
+          </Button>
+        }
       />
 
       <StatusNotice notice={params.notice} messages={userNoticeMessages} />
@@ -100,6 +124,10 @@ export default async function UsersPage({
           manageableUserIds={manageableUserIds}
           currentUserId={session.user.id}
           total={usersPage.total}
+          q={usersPage.q}
+          pageSize={usersPage.pageSize}
+          sort={usersPage.sort}
+          order={usersPage.order}
         />
         <div className="rounded-b-xl bg-card shadow-card">
           <ListPagination
@@ -108,6 +136,8 @@ export default async function UsersPage({
             pageSize={usersPage.pageSize}
             total={usersPage.total}
             q={usersPage.q}
+            sort={usersPage.sort}
+            order={usersPage.order}
           />
         </div>
       </div>

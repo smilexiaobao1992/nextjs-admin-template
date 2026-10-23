@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { buildListHref, totalPages } from "@/lib/list/pagination";
+import {
+  buildListHref,
+  PAGE_SIZE_OPTIONS,
+  totalPages,
+  type SortOrder,
+} from "@/lib/list/pagination";
 import { cn } from "@/lib/utils";
 
 export function ListPagination({
@@ -8,12 +13,16 @@ export function ListPagination({
   pageSize,
   total,
   q = "",
+  sort,
+  order,
 }: {
   pathname: string;
   page: number;
   pageSize: number;
   total: number;
   q?: string;
+  sort?: string;
+  order?: SortOrder;
 }) {
   const pages = totalPages(total, pageSize);
   if (total === 0) {
@@ -22,21 +31,54 @@ export function ListPagination({
 
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
-  const prevHref = buildListHref(pathname, { page: page - 1, q, pageSize });
-  const nextHref = buildListHref(pathname, { page: page + 1, q, pageSize });
+  const prevHref = buildListHref(pathname, { page: page - 1, q, pageSize, sort, order });
+  const nextHref = buildListHref(pathname, { page: page + 1, q, pageSize, sort, order });
 
   return (
     <nav
       aria-label="分页"
       className="flex flex-col gap-3 border-t border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p className="text-sm text-muted-foreground">
-        显示 <span className="tabular-nums text-foreground">{from}</span>
-        {" – "}
-        <span className="tabular-nums text-foreground">{to}</span>
-        {" / "}
-        <span className="tabular-nums text-foreground">{total}</span>
-      </p>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <p>
+          显示 <span className="tabular-nums text-foreground">{from}</span>
+          {" – "}
+          <span className="tabular-nums text-foreground">{to}</span>
+          {" / "}
+          <span className="tabular-nums text-foreground">{total}</span>
+        </p>
+        <div
+          role="group"
+          aria-label="每页显示条数"
+          className="inline-flex items-center gap-1 rounded-lg bg-muted/60 p-0.5 text-xs"
+        >
+          {PAGE_SIZE_OPTIONS.map((size) => {
+            const active = pageSize === size;
+            const href = buildListHref(pathname, {
+              page: 1,
+              q,
+              pageSize: size,
+              sort,
+              order,
+            });
+            return (
+              <Link
+                key={size}
+                href={href}
+                aria-current={active ? "true" : undefined}
+                className={cn(
+                  "rounded-md px-2 py-1 tabular-nums transition-colors",
+                  active
+                    ? "bg-card font-medium text-foreground shadow-soft"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {size} 条/页
+              </Link>
+            );
+          })}
+        </div>
+      </div>
       <div className="flex items-center gap-2">
         <PaginationLink href={prevHref} disabled={page <= 1}>
           上一页

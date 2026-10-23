@@ -132,7 +132,11 @@ export function MenuGrantTree({
   function renderActions(parent: GrantTreeNode) {
     const actions = childrenOf(parent.id).filter((item) => item.type === "action");
     if (actions.length === 0) {
-      return null;
+      return (
+        <span className="text-xs text-muted-foreground">
+          仅页面访问（无额外细分操作）
+        </span>
+      );
     }
     return (
       <div className="flex flex-wrap gap-2">
@@ -140,7 +144,8 @@ export function MenuGrantTree({
           <label
             key={action.id}
             className={cn(
-              "flex min-h-9 items-center gap-2 rounded-lg border border-border/70 bg-card/70 px-3 text-sm",
+              "flex min-h-9 items-center gap-2 rounded-lg border border-border/70 bg-card px-3 text-sm transition-colors",
+              checked.has(action.id) ? "border-primary/40 bg-primary/8 font-medium text-foreground" : "",
               canToggle(action) ? "cursor-pointer hover:bg-accent" : "opacity-60",
             )}
           >
@@ -152,7 +157,6 @@ export function MenuGrantTree({
               className="size-4"
             />
             <span>{action.title}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">{action.permissionKey}</span>
           </label>
         ))}
       </div>
@@ -161,7 +165,7 @@ export function MenuGrantTree({
 
   function renderPage(page: GrantTreeNode) {
     return (
-      <div key={page.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-center">
+      <div key={page.id} className="grid gap-3 px-4 py-3.5 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-center">
         <label className={cn("flex min-w-0 items-center gap-2.5", canToggle(page) ? "cursor-pointer" : "")}>
           {page.permissionKey ? (
             <input
@@ -176,9 +180,11 @@ export function MenuGrantTree({
           )}
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{page.title}</span>
-            <span className="block truncate font-mono text-[11px] text-muted-foreground">
-              {page.permissionKey ?? "登录即可访问"}
-            </span>
+            {!page.permissionKey ? (
+              <span className="block truncate text-xs text-muted-foreground">
+                全员公开页面
+              </span>
+            ) : null}
           </span>
         </label>
         {renderActions(page)}
@@ -189,17 +195,53 @@ export function MenuGrantTree({
   const roots = childrenOf(null);
   const rootPages = roots.filter((item) => item.type === "page");
   const directories = roots.filter((item) => item.type === "directory");
+  const allGrantable = nodes.filter((item) => item.permissionKey);
+  const editableGrantable = allGrantable.filter(canToggle);
+  const totalCheckedCount = allGrantable.filter((item) => checked.has(item.id)).length;
 
   return (
     <fieldset>
-      <legend className="mb-1 text-sm font-medium">权限范围</legend>
-      <p className="mb-3 text-xs text-muted-foreground">勾选页面即可访问；勾选操作会自动勾选所属页面。</p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <legend className="text-sm font-medium">功能与菜单权限</legend>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            左侧勾选「可访问的菜单页面」，右侧勾选「页面内允许执行的操作」；勾选操作会自动开启对应页面访问权。
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground">
+            已开启 {totalCheckedCount} / {allGrantable.length} 项
+          </span>
+          {!readOnly && editableGrantable.length > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => toggleGroup(editableGrantable, true)}
+                className="rounded-md border border-border/80 bg-card px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                全选
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleGroup(editableGrantable, false)}
+                className="rounded-md border border-border/80 bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                清空
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
 
       {[...checked].map((id) => (
         <input key={id} type="hidden" name="menuIds" value={id} />
       ))}
 
-      <div className="divide-y divide-border/70 overflow-hidden rounded-lg bg-secondary/35">
+      <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-secondary/25">
+        <div className="hidden grid-cols-[14rem_minmax(0,1fr)] bg-muted/60 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid">
+          <span>菜单页面（访问权限）</span>
+          <span>页面内功能（操作权限）</span>
+        </div>
         {rootPages.length > 0 ? <div className="divide-y divide-border/50">{rootPages.map(renderPage)}</div> : null}
 
         {directories.map((directory) => {

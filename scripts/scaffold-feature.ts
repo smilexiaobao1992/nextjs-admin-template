@@ -101,7 +101,14 @@ export async function list${pascal}Page(query: ParsedListQuery) {
   const total = filtered.length;
   const page = clampPage(query.page, total, query.pageSize);
   const offset = (page - 1) * query.pageSize;
-  const items = filtered.slice(offset, offset + query.pageSize);
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = query.order === "asc" ? 1 : -1;
+    if (query.sort === "name") {
+      return a.name.localeCompare(b.name, "zh-CN") * dir;
+    }
+    return (a.createdAt.getTime() - b.createdAt.getTime()) * dir;
+  });
+  const items = sorted.slice(offset, offset + query.pageSize);
 
   return {
     items,
@@ -109,6 +116,8 @@ export async function list${pascal}Page(query: ParsedListQuery) {
     page,
     pageSize: query.pageSize,
     q: query.q,
+    sort: query.sort,
+    order: query.order,
   };
 }
 `;

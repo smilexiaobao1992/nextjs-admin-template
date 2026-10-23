@@ -1,10 +1,15 @@
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+export type SortOrder = "asc" | "desc";
 
 export type ListQueryInput = {
   page?: string | string[] | undefined;
   q?: string | string[] | undefined;
   pageSize?: string | string[] | undefined;
+  sort?: string | string[] | undefined;
+  order?: string | string[] | undefined;
 };
 
 export type ParsedListQuery = {
@@ -12,6 +17,8 @@ export type ParsedListQuery = {
   pageSize: number;
   q: string;
   offset: number;
+  sort: string;
+  order: SortOrder;
 };
 
 function firstString(value: string | string[] | undefined): string {
@@ -29,19 +36,41 @@ function parsePositiveInt(value: string, fallback: number): number {
   return parsed;
 }
 
-/** Parse common list search params: page, q, pageSize. */
-export function parseListQuery(input: ListQueryInput, defaults?: { pageSize?: number }): ParsedListQuery {
+/** Parse common list search params: page, q, pageSize, sort, order. */
+export function parseListQuery(
+  input: ListQueryInput,
+  defaults?: {
+    pageSize?: number;
+    sort?: string;
+    order?: SortOrder;
+    allowedSorts?: readonly string[];
+  },
+): ParsedListQuery {
   const pageSizeDefault = defaults?.pageSize ?? DEFAULT_PAGE_SIZE;
   const page = parsePositiveInt(firstString(input.page), 1);
   const rawPageSize = parsePositiveInt(firstString(input.pageSize), pageSizeDefault);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, rawPageSize));
   const q = firstString(input.q).trim().slice(0, 100);
 
+  const rawSort = firstString(input.sort).trim().slice(0, 40);
+  const defaultSort = defaults?.sort ?? "";
+  const sort = defaults?.allowedSorts
+    ? defaults.allowedSorts.includes(rawSort)
+      ? rawSort
+      : defaultSort
+    : rawSort || defaultSort;
+
+  const rawOrder = firstString(input.order).trim().toLowerCase();
+  const order: SortOrder =
+    rawOrder === "asc" || rawOrder === "desc" ? rawOrder : (defaults?.order ?? "desc");
+
   return {
     page,
     pageSize,
     q,
     offset: (page - 1) * pageSize,
+    sort,
+    order,
   };
 }
 
@@ -64,7 +93,13 @@ export function escapeLikePattern(value: string): string {
 
 export function buildListHref(
   pathname: string,
-  params: { page?: number; q?: string; pageSize?: number },
+  params: {
+    page?: number;
+    q?: string;
+    pageSize?: number;
+    sort?: string;
+    order?: SortOrder;
+  },
 ): string {
   const search = new URLSearchParams();
   if (params.q) {
@@ -75,6 +110,12 @@ export function buildListHref(
   }
   if (params.pageSize && params.pageSize !== DEFAULT_PAGE_SIZE) {
     search.set("pageSize", String(params.pageSize));
+  }
+  if (params.sort) {
+    search.set("sort", params.sort);
+    if (params.order) {
+      search.set("order", params.order);
+    }
   }
   const query = search.toString();
   return query ? `${pathname}?${query}` : pathname;

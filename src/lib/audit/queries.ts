@@ -1,7 +1,9 @@
-import { count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/db/schema";
 import { clampPage, escapeLikePattern, type ParsedListQuery } from "@/lib/list/pagination";
+
+export const AUDIT_SORT_COLUMNS = ["createdAt", "action", "actorEmail", "resourceType"] as const;
 
 function searchCondition(q: string): SQL | undefined {
   if (!q) {
@@ -15,6 +17,21 @@ function searchCondition(q: string): SQL | undefined {
     ilike(auditLog.resourceType, pattern),
     ilike(auditLog.resourceId, pattern),
   );
+}
+
+function resolveAuditOrder(sort: string, order: "asc" | "desc") {
+  const dir = order === "asc" ? asc : desc;
+  switch (sort) {
+    case "action":
+      return dir(auditLog.action);
+    case "actorEmail":
+      return dir(auditLog.actorEmail);
+    case "resourceType":
+      return dir(auditLog.resourceType);
+    case "createdAt":
+    default:
+      return dir(auditLog.createdAt);
+  }
 }
 
 export async function listAuditLogsPage(query: ParsedListQuery) {
@@ -32,11 +49,28 @@ export async function listAuditLogsPage(query: ParsedListQuery) {
     .select()
     .from(auditLog)
     .where(where)
-    .orderBy(desc(auditLog.createdAt))
+    .orderBy(resolveAuditOrder(query.sort, query.order))
     .limit(query.pageSize)
     .offset(offset);
 
-  return { items, total, page, pageSize: query.pageSize };
+  return {
+    items,
+    total,
+    page,
+    pageSize: query.pageSize,
+    sort: query.sort,
+    order: query.order,
+  };
+}
+
+export async function listAuditLogsForExport(q = "", limit = 2000) {
+  const where = searchCondition(q.trim().slice(0, 100));
+  return db
+    .select()
+    .from(auditLog)
+    .where(where)
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit);
 }
 
 export async function countAuditLogs() {

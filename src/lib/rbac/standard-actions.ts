@@ -35,3 +35,35 @@ export function deriveStandardActions(pagePermissionKey: string | null | undefin
     .filter((item) => item.permissionKey !== key && isValidPermissionKey(item.permissionKey))
     .map((item, index) => ({ ...item, sortOrder: (index + 1) * 10 }));
 }
+
+/**
+ * Automatically derive a default `<resource>:read` permission key from a page route
+ * such as `/app/orders` → `orders:read` or `/app/inventory-items` → `inventory_items:read`,
+ * so administrators only need to enter the page path without inventing permission keys.
+ */
+export function derivePagePermissionKeyFromHref(href: string): string | null {
+  const cleaned = href.trim().replace(/^\/+|\/+$/g, "");
+  if (!cleaned) {
+    return null;
+  }
+  if (cleaned.toLowerCase() === "app") {
+    return "dashboard:view";
+  }
+  const segments = cleaned
+    .split("/")
+    .filter((segment) => segment && segment !== "app")
+    .map((segment) =>
+      segment
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, ""),
+    )
+    .filter((segment) => /^[a-z][a-z0-9_]*$/.test(segment));
+
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const candidate = `${segments.join("_").slice(0, 48)}:read`;
+  return isValidPermissionKey(candidate) ? candidate : null;
+}

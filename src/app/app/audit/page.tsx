@@ -1,8 +1,11 @@
+import { Download } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import {
+  SortableTableHead,
   Table,
   TableBody,
   TableCell,
@@ -10,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listAuditLogsPage } from "@/lib/audit/queries";
+import { AUDIT_SORT_COLUMNS, listAuditLogsPage } from "@/lib/audit/queries";
 import { requirePermission } from "@/lib/auth/session";
 import { parseListQuery } from "@/lib/list/pagination";
 import { formatDateTime } from "@/lib/utils";
@@ -18,12 +21,25 @@ import { formatDateTime } from "@/lib/utils";
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    pageSize?: string;
+    sort?: string;
+    order?: string;
+  }>;
 }) {
   await requirePermission("audit:read");
   const params = await searchParams;
-  const listQuery = parseListQuery(params);
+  const listQuery = parseListQuery(params, {
+    sort: "createdAt",
+    order: "desc",
+    allowedSorts: AUDIT_SORT_COLUMNS,
+  });
   const result = await listAuditLogsPage(listQuery);
+  const exportHref = listQuery.q
+    ? `/app/audit/export?q=${encodeURIComponent(listQuery.q)}`
+    : "/app/audit/export";
 
   return (
     <div className="space-y-7">
@@ -31,6 +47,14 @@ export default async function AuditPage({
         eyebrow="审计"
         title="操作审计"
         description="只读查看关键写操作记录。审计行由系统追加写入，普通用户不可修改或删除。"
+        actions={
+          <Button variant="outline" size="sm" asChild className="gap-1.5">
+            <a href={exportHref} download>
+              <Download aria-hidden="true" className="size-4" />
+              导出 CSV
+            </a>
+          </Button>
+        }
       />
 
       <div className="rounded-xl bg-card p-5 shadow-card">
@@ -64,11 +88,47 @@ export default async function AuditPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>时间</TableHead>
-                <TableHead>操作人</TableHead>
-                <TableHead>动作</TableHead>
+                <SortableTableHead
+                  column="createdAt"
+                  currentSort={result.sort}
+                  currentOrder={result.order}
+                  pathname="/app/audit"
+                  q={listQuery.q}
+                  pageSize={result.pageSize}
+                >
+                  时间
+                </SortableTableHead>
+                <SortableTableHead
+                  column="actorEmail"
+                  currentSort={result.sort}
+                  currentOrder={result.order}
+                  pathname="/app/audit"
+                  q={listQuery.q}
+                  pageSize={result.pageSize}
+                >
+                  操作人
+                </SortableTableHead>
+                <SortableTableHead
+                  column="action"
+                  currentSort={result.sort}
+                  currentOrder={result.order}
+                  pathname="/app/audit"
+                  q={listQuery.q}
+                  pageSize={result.pageSize}
+                >
+                  动作
+                </SortableTableHead>
                 <TableHead>摘要</TableHead>
-                <TableHead>资源</TableHead>
+                <SortableTableHead
+                  column="resourceType"
+                  currentSort={result.sort}
+                  currentOrder={result.order}
+                  pathname="/app/audit"
+                  q={listQuery.q}
+                  pageSize={result.pageSize}
+                >
+                  资源
+                </SortableTableHead>
                 <TableHead>IP</TableHead>
               </TableRow>
             </TableHeader>
@@ -106,6 +166,8 @@ export default async function AuditPage({
           pageSize={result.pageSize}
           total={result.total}
           q={listQuery.q}
+          sort={result.sort}
+          order={result.order}
         />
       </section>
     </div>

@@ -8,13 +8,40 @@ import {
 } from "./pagination";
 
 describe("list pagination helpers", () => {
-  it("parses page, query and page size with sane defaults", () => {
-    expect(parseListQuery({})).toEqual({ page: 1, pageSize: 20, q: "", offset: 0 });
-    expect(parseListQuery({ page: "3", q: "  alice  ", pageSize: "10" })).toEqual({
+  it("parses page, query, page size and sort with sane defaults", () => {
+    expect(parseListQuery({})).toEqual({
+      page: 1,
+      pageSize: 20,
+      q: "",
+      offset: 0,
+      sort: "",
+      order: "desc",
+    });
+    expect(
+      parseListQuery({ page: "3", q: "  alice  ", pageSize: "10", sort: "name", order: "asc" }),
+    ).toEqual({
       page: 3,
       pageSize: 10,
       q: "alice",
       offset: 20,
+      sort: "name",
+      order: "asc",
+    });
+  });
+
+  it("enforces allowedSorts whitelist when provided", () => {
+    expect(
+      parseListQuery(
+        { sort: "dropped_column", order: "asc" },
+        { sort: "createdAt", allowedSorts: ["name", "createdAt"] },
+      ),
+    ).toEqual({
+      page: 1,
+      pageSize: 20,
+      q: "",
+      offset: 0,
+      sort: "createdAt",
+      order: "asc",
     });
   });
 
@@ -33,8 +60,11 @@ describe("list pagination helpers", () => {
     expect(escapeLikePattern("100%_off\\x")).toBe("100\\%\\_off\\\\x");
   });
 
-  it("builds stable list hrefs", () => {
+  it("builds stable list hrefs including sort and pageSize", () => {
     expect(buildListHref("/app/users", { page: 1, q: "" })).toBe("/app/users");
     expect(buildListHref("/app/users", { page: 2, q: "a" })).toBe("/app/users?q=a&page=2");
+    expect(
+      buildListHref("/app/users", { page: 1, q: "a", pageSize: 50, sort: "name", order: "asc" }),
+    ).toBe("/app/users?q=a&pageSize=50&sort=name&order=asc");
   });
 });

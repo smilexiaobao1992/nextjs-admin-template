@@ -1,5 +1,8 @@
 import * as React from "react"
+import Link from "next/link"
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
 
+import { buildListHref, type SortOrder } from "@/lib/list/pagination"
 import { cn } from "@/lib/utils"
 
 const Table = React.forwardRef<
@@ -72,6 +75,62 @@ const TableHead = React.forwardRef<
 ))
 TableHead.displayName = "TableHead"
 
+function SortableTableHead({
+  column,
+  currentSort,
+  currentOrder = "desc",
+  pathname,
+  q = "",
+  pageSize,
+  children,
+  className,
+}: {
+  column: string
+  currentSort?: string
+  currentOrder?: SortOrder
+  pathname: string
+  q?: string
+  pageSize?: number
+  children: React.ReactNode
+  className?: string
+}) {
+  const isActive = currentSort === column
+  const nextOrder: SortOrder = isActive
+    ? currentOrder === "asc"
+      ? "desc"
+      : "asc"
+    : "asc"
+  const href = buildListHref(pathname, {
+    page: 1,
+    q,
+    pageSize,
+    sort: column,
+    order: nextOrder,
+  })
+  const Icon = !isActive ? ArrowUpDown : currentOrder === "asc" ? ArrowUp : ArrowDown
+
+  return (
+    <TableHead
+      aria-sort={isActive ? (currentOrder === "asc" ? "ascending" : "descending") : "none"}
+      className={className}
+    >
+      <Link
+        href={href}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-md py-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          isActive && "font-semibold text-foreground",
+        )}
+      >
+        <span>{children}</span>
+        <Icon
+          aria-hidden="true"
+          className={cn("size-3.5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/60")}
+        />
+      </Link>
+    </TableHead>
+  )
+}
+
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
@@ -102,6 +161,7 @@ export {
   TableBody,
   TableFooter,
   TableHead,
+  SortableTableHead,
   TableRow,
   TableCell,
   TableCaption,
