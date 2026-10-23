@@ -1,6 +1,7 @@
 import { Download } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import { StatusNotice } from "@/components/ui/status-notice";
@@ -57,30 +58,28 @@ export default async function UsersPage({
           nextPermissionIds: menuIdsByRole[item.id] ?? [],
         }),
       );
-  const manageableUserIds = new Set(
-    usersPage.items
-      .filter((item) => {
-        if (canManageSystemRoles) {
-          return true;
-        }
+  const manageableUserIds = usersPage.items
+    .filter((item) => {
+      if (canManageSystemRoles) {
+        return true;
+      }
 
-        const targetRoleKeys = new Set(parseRoleKeys(item.role));
-        const targetRoles = roles.filter((role) => targetRoleKeys.has(role.key));
-        if (targetRoles.length !== targetRoleKeys.size || targetRoles.some((role) => role.isSystem)) {
-          return false;
-        }
+      const targetRoleKeys = new Set(parseRoleKeys(item.role));
+      const targetRoles = roles.filter((role) => targetRoleKeys.has(role.key));
+      if (targetRoles.length !== targetRoleKeys.size || targetRoles.some((role) => role.isSystem)) {
+        return false;
+      }
 
-        const targetPermissionIds = targetRoles.flatMap(
-          (role) => menuIdsByRole[role.id] ?? [],
-        );
-        return canManageRolePermissionSets({
-          actorPermissionIds,
-          currentPermissionIds: targetPermissionIds,
-          nextPermissionIds: targetPermissionIds,
-        });
-      })
-      .map((item) => item.id),
-  );
+      const targetPermissionIds = targetRoles.flatMap(
+        (role) => menuIdsByRole[role.id] ?? [],
+      );
+      return canManageRolePermissionSets({
+        actorPermissionIds,
+        currentPermissionIds: targetPermissionIds,
+        nextPermissionIds: targetPermissionIds,
+      });
+    })
+    .map((item) => item.id);
   const exportHref = usersPage.q
     ? `/app/users/export?q=${encodeURIComponent(usersPage.q)}`
     : "/app/users/export";
@@ -105,14 +104,14 @@ export default async function UsersPage({
 
       {canWrite ? <CreateUserForm roles={assignableRoles} /> : null}
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
+      <Card className="p-5">
         <ListSearchForm
           action="/app/users"
           defaultQuery={usersPage.q}
           placeholder="按姓名、邮箱或角色搜索"
           label="搜索用户"
         />
-      </div>
+      </Card>
 
       <div className="space-y-0 overflow-hidden rounded-xl">
         <UserList
@@ -129,7 +128,7 @@ export default async function UsersPage({
           sort={usersPage.sort}
           order={usersPage.order}
         />
-        <div className="rounded-b-xl bg-card shadow-card">
+        <Card className="rounded-t-none">
           <ListPagination
             pathname="/app/users"
             page={usersPage.page}
@@ -139,7 +138,7 @@ export default async function UsersPage({
             sort={usersPage.sort}
             order={usersPage.order}
           />
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,4 +1,14 @@
+"use client";
+
+import { useState } from "react";
+import { Users } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   SortableTableHead,
   Table,
@@ -8,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { batchSetUsersBannedAction } from "@/features/users/actions";
 import type { ListedUser } from "@/features/users/queries";
 import type { Role } from "@/lib/db/schema";
 import type { SortOrder } from "@/lib/list/pagination";
@@ -34,7 +45,7 @@ export function UserList({
   assignableRoles?: Role[];
   canWrite: boolean;
   canManageSystemRoles?: boolean;
-  manageableUserIds?: Set<string>;
+  manageableUserIds?: ReadonlySet<string> | readonly string[];
   currentUserId?: string;
   total: number;
   q?: string;
@@ -42,33 +53,121 @@ export function UserList({
   sort?: string;
   order?: SortOrder;
 }) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const roleNameByKey = Object.fromEntries(roles.map((item) => [item.key, item.name]));
   const systemRoleKeys = new Set(roles.filter((item) => item.isSystem).map((item) => item.key));
-  const assignableRoles = allowedRoles ?? (canManageSystemRoles ? roles : roles.filter((item) => !item.isSystem));
+  const assignableRoles =
+    allowedRoles ?? (canManageSystemRoles ? roles : roles.filter((item) => !item.isSystem));
+  const manageableSet = manageableUserIds ? new Set(manageableUserIds) : null;
+
+  function canMutateRow(item: ListedUser): boolean {
+    const isSelf = currentUserId === item.id;
+    const itemRoleKeys = parseRoleKeys(item.role);
+    const targetIsManageable = manageableSet
+      ? manageableSet.has(item.id)
+      : canManageSystemRoles || !itemRoleKeys.some((key) => systemRoleKeys.has(key));
+    return canWrite && targetIsManageable && !isSelf;
+  }
+
+  const selectableIds = users.filter(canMutateRow).map((item) => item.id);
+  const validSelectedIds = selectedIds.filter((id) => selectableIds.includes(id));
+  const allSelected =
+    selectableIds.length > 0 && validSelectedIds.length === selectableIds.length;
+
+  function toggleRow(userId: string, checked: boolean) {
+    setSelectedIds((prev) =>
+      checked ? Array.from(new Set([...prev, userId])) : prev.filter((id) => id !== userId),
+    );
+  }
+
+  function toggleAll(checked: boolean) {
+    setSelectedIds(checked ? selectableIds : []);
+  }
 
   return (
-    <section
+    <Card
       aria-labelledby="user-list-title"
-      className="overflow-hidden rounded-xl bg-card shadow-card"
+      className="overflow-hidden rounded-b-none"
     >
-      <div className="border-b border-border/70 px-5 py-4">
-        <h2 id="user-list-title" className="font-semibold">账号列表</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          共 <span className="tabular-nums">{total}</span> 个账号
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+        <div>
+          <h2 id="user-list-title" className="font-semibold">账号列表</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            共 <span className="tabular-nums">{total}</span> 个账号
+          </p>
+        </div>
+
+        {canWrite && validSelectedIds.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/60 px-3 py-1.5">
+            <span className="text-xs font-medium tabular-nums">
+              已选 {validSelectedIds.length} 项
+            </span>
+            <form action={batchSetUsersBannedAction} className="inline-flex">
+              {validSelectedIds.map((id) => (
+                <input key={id} type="hidden" name="userIds" value={id} />
+              ))}
+              <input type="hidden" name="banned" value="true" />
+              <ConfirmSubmitButton
+                variant="destructive"
+                size="sm"
+                className="h-8 px-2.5 text-xs"
+                confirmTitle="确认批量封禁"
+                confirmMessage={`确认批量封禁已选的 ${validSelectedIds.length} 个账号？封禁后其全部登录会话将立即失效。`}
+                confirmLabel="确认封禁"
+                pendingLabel="封禁中…"
+              >
+                批量封禁
+              </ConfirmSubmitButton>
+            </form>
+            <form action={batchSetUsersBannedAction} className="inline-flex">
+              {validSelectedIds.map((id) => (
+                <input key={id} type="hidden" name="userIds" value={id} />
+              ))}
+              <input type="hidden" name="banned" value="false" />
+              <ConfirmSubmitButton
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-xs"
+                confirmTitle="确认批量解封"
+                confirmMessage={`确认批量解封已选的 ${validSelectedIds.length} 个账号？`}
+                confirmLabel="确认解封"
+                pendingLabel="解封中…"
+              >
+                批量解封
+              </ConfirmSubmitButton>
+            </form>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs text-muted-foreground"
+              onClick={() => setSelectedIds([])}
+            >
+              取消
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {users.length === 0 ? (
-        <div className="px-5 py-12 text-center">
-          <p className="font-medium">没有匹配的账号</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            调整搜索条件，或点击上方“创建用户”添加账号。若没有操作权限，请联系系统管理员。
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="没有匹配的账号"
+          description="调整搜索条件，或点击上方“创建用户”添加账号。若没有操作权限，请联系系统管理员。"
+        />
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
+              {canWrite && selectableIds.length > 0 ? (
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="全选当前页可管理账号"
+                    checked={allSelected}
+                    onChange={(event) => toggleAll(event.currentTarget.checked)}
+                  />
+                </TableHead>
+              ) : null}
               <SortableTableHead
                 column="name"
                 currentSort={sort}
@@ -107,18 +206,35 @@ export function UserList({
             {users.map((item) => {
               const isSelf = currentUserId === item.id;
               const itemRoleKeys = parseRoleKeys(item.role);
-              const targetIsManageable = manageableUserIds
-                ? manageableUserIds.has(item.id)
-                : canManageSystemRoles || !itemRoleKeys.some((key) => systemRoleKeys.has(key));
-              const canMutate =
-                canWrite && targetIsManageable && !isSelf;
+              const canMutate = canMutateRow(item);
 
               return (
-                <TableRow key={item.id}>
+                <TableRow
+                  key={item.id}
+                  data-state={validSelectedIds.includes(item.id) ? "selected" : undefined}
+                >
+                  {canWrite && selectableIds.length > 0 ? (
+                    <TableCell className="w-10">
+                      {canMutate ? (
+                        <Checkbox
+                          aria-label={`选择账号 ${item.email}`}
+                          checked={validSelectedIds.includes(item.id)}
+                          onChange={(event) => toggleRow(item.id, event.currentTarget.checked)}
+                        />
+                      ) : null}
+                    </TableCell>
+                  ) : null}
                   <TableCell>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="max-w-72 truncate text-xs text-muted-foreground">{item.email}</p>
-                    {isSelf ? <p className="mt-1 text-xs text-muted-foreground">当前登录账号</p> : null}
+                    <div className="flex items-center gap-3">
+                      <Avatar name={item.name} size="sm" />
+                      <div className="min-w-0">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="max-w-72 truncate text-xs text-muted-foreground">{item.email}</p>
+                        {isSelf ? (
+                          <p className="mt-1 text-xs text-muted-foreground">当前登录账号</p>
+                        ) : null}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span>{itemRoleKeys.map((key) => roleNameByKey[key] ?? key).join("、")}</span>
@@ -165,6 +281,6 @@ export function UserList({
           </TableBody>
         </Table>
       )}
-    </section>
+    </Card>
   );
 }

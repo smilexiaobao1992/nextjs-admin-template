@@ -487,3 +487,98 @@ export async function listSessionsForUser(userId: string) {
     .where(and(eq(session.userId, userId), gt(session.expiresAt, new Date())))
     .orderBy(desc(session.updatedAt));
 }
+
+export async function updateOwnProfile({
+  userId,
+  name,
+  audit,
+}: {
+  userId: string;
+  name: string;
+  audit: WriteAuditLogInput;
+}) {
+  const normalizedName = name.trim();
+  if (!normalizedName || normalizedName.length > 100) {
+    throw new UserManagementError("invalid_input");
+  }
+
+  return db.transaction(async (tx) => {
+    await tx
+      .update(user)
+      .set({ name: normalizedName, updatedAt: new Date() })
+      .where(eq(user.id, userId));
+    await writeAuditLog(audit, tx);
+  });
+}
+
+export async function batchSetUsersBanned({
+  userIds,
+  banned,
+  banReason,
+  actorUserId,
+  actorRoleKey,
+  audit,
+}: {
+  userIds: string[];
+  banned: boolean;
+  banReason?: string | null;
+  actorUserId: string;
+  actorRoleKey: string;
+  audit: WriteAuditLogInput;
+}) {
+  const uniqueIds = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    throw new UserManagementError("invalid_input");
+  }
+  if (uniqueIds.includes(actorUserId)) {
+    throw new UserManagementError("self_forbidden");
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select id from "user" where ${SYSTEM_ADMIN_ROLE_KEY} = any(string_to_array(role, ',')) for update`,
+    );
+
+    const targets = await tx
+      .select({ id: user.id, role: user.role, banned: user.banned })
+      .from(user)
+      .where(inArray(user.id, uniqueIds));
+
+    if (targets.length !== uniqueIds.length) {
+      throw new UserManagementError("not_found");
+    }
+
+    for (const target of targets) {
+      await assertCanManageTargetRoles(tx, actorRoleKey, target.role);
+    }
+
+    if (banned) {
+      const activeAdminsBeingBanned = targets.filter(
+        (target) => hasSystemAdminRole(target.role) && !target.banned,
+      ).length;
+      if (activeAdminsBeingBanned > 0) {
+        const adminCount = await countActiveAdmins(tx);
+        if (adminCount - activeAdminsBeingBanned < 1) {
+          throw new UserManagementError("last_admin");
+        }
+      }
+    }
+
+    const reason = banned ? (banReason?.trim().slice(0, 200) || null) : null;
+    await tx
+      .update(user)
+      .set({
+        banned,
+        banReason: reason,
+        banExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(inArray(user.id, uniqueIds));
+
+    if (banned) {
+      await tx.delete(session).where(inArray(session.userId, uniqueIds));
+    }
+
+    await writeAuditLog(audit, tx);
+  });
+}

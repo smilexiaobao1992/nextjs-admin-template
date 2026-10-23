@@ -1,7 +1,9 @@
-import { Download } from "lucide-react";
+import { Download, FileClock } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import {
@@ -13,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AuditDetailSheet } from "@/features/audit/components/audit-detail-sheet";
 import { AUDIT_SORT_COLUMNS, listAuditLogsPage } from "@/lib/audit/queries";
 import { requirePermission } from "@/lib/auth/session";
 import { parseListQuery } from "@/lib/list/pagination";
@@ -57,18 +60,18 @@ export default async function AuditPage({
         }
       />
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
+      <Card className="p-5">
         <ListSearchForm
           action="/app/audit"
           defaultQuery={listQuery.q}
           placeholder="按操作、摘要、操作人或资源搜索"
           label="搜索审计"
         />
-      </div>
+      </Card>
 
-      <section
+      <Card
         aria-labelledby="audit-list-title"
-        className="overflow-hidden rounded-xl bg-card shadow-card"
+        className="overflow-hidden"
       >
         <div className="border-b border-border/70 px-5 py-4">
           <h2 id="audit-list-title" className="font-semibold">
@@ -80,10 +83,11 @@ export default async function AuditPage({
         </div>
 
         {result.items.length === 0 ? (
-          <div className="px-5 py-12 text-center">
-            <p className="font-medium">暂无审计记录</p>
-            <p className="mt-2 text-sm text-muted-foreground">执行用户、角色、权限或菜单变更后会出现在这里。</p>
-          </div>
+          <EmptyState
+            icon={FileClock}
+            title="暂无审计记录"
+            description="执行用户、角色、权限或菜单变更后会出现在这里。"
+          />
         ) : (
           <Table>
             <TableHeader>
@@ -130,6 +134,7 @@ export default async function AuditPage({
                   资源
                 </SortableTableHead>
                 <TableHead>IP</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -154,6 +159,9 @@ export default async function AuditPage({
                   <TableCell className="tabular-nums text-xs text-muted-foreground">
                     {item.ipAddress ?? "—"}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <AuditDetailSheet item={item} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -169,7 +177,7 @@ export default async function AuditPage({
           sort={result.sort}
           order={result.order}
         />
-      </section>
+      </Card>
     </div>
   );
 }

@@ -1,12 +1,15 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Plus, Shield, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GuardedDirectoryLink, GuardedEditForm } from "@/components/ui/guarded-edit-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusNotice } from "@/components/ui/status-notice";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Switch } from "@/components/ui/switch";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
 import { can, requirePermission } from "@/lib/auth/session";
@@ -71,7 +74,7 @@ export default async function RolesPage({
       <StatusNotice notice={notice} messages={rbacNoticeMessages} />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">
+        <Card className="overflow-hidden lg:sticky lg:top-24">
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">角色列表</h2>
@@ -89,7 +92,7 @@ export default async function RolesPage({
             ) : null}
           </div>
           {roles.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">还没有角色。</div>
+            <EmptyState icon={Shield} title="还没有角色" />
           ) : (
             <nav aria-label="角色列表" className="max-h-[60vh] space-y-1 overflow-y-auto p-2.5 lg:max-h-[calc(100vh-12rem)]">
               {roles.map((item) => {
@@ -124,12 +127,12 @@ export default async function RolesPage({
               })}
             </nav>
           )}
-        </aside>
+        </Card>
 
-        <section
+        <Card
           key={createMode ? "create" : selectedRole?.id ?? "empty"}
           id="rbac-detail"
-          className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-card sm:p-6"
+          className="min-w-0 scroll-mt-20 p-5 sm:p-6"
         >
           {createMode ? (
             <>
@@ -173,8 +176,8 @@ export default async function RolesPage({
                 </details>
 
                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
-                  <label className="flex min-h-10 items-center gap-2 text-sm">
-                    <input type="checkbox" name="isDefault" />
+                  <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm">
+                    <Switch name="isDefault" />
                     设为新用户默认角色
                   </label>
                   <SubmitButton pendingLabel="创建中…">创建角色</SubmitButton>
@@ -190,13 +193,13 @@ export default async function RolesPage({
               canEdit={canWrite && canManageSelectedRole && (!selectedRole.isSystem || canManageSystemRoles)}
             />
           ) : (
-            <div className="py-16 text-center">
-              <Shield aria-hidden="true" className="mx-auto size-8 text-muted-foreground" />
-              <p className="mt-4 font-medium">请选择角色</p>
-              <p className="mt-2 text-sm text-muted-foreground">从左侧列表选择要查看或配置权限的角色。</p>
-            </div>
+            <EmptyState
+              icon={Shield}
+              title="请选择角色"
+              description="从左侧列表选择要查看或配置权限的角色。"
+            />
           )}
-        </section>
+        </Card>
       </div>
     </div>
   );
@@ -274,8 +277,8 @@ function RoleDetail({
             <MenuGrantTree nodes={nodes} grantedIds={grantedIds} editableIds={editableIds} />
           )}
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
-            <label className="flex min-h-10 items-center gap-2 text-sm">
-              <input type="checkbox" name="isDefault" defaultChecked={role.isDefault} disabled={role.isSystem} />
+            <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm">
+              <Switch name="isDefault" defaultChecked={role.isDefault} disabled={role.isSystem} />
               设为新用户默认角色
             </label>
             <SubmitButton pendingLabel="保存中…">保存角色权限</SubmitButton>

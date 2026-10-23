@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { Avatar, getInitials } from "./avatar";
 import { Badge } from "./badge";
 import { Checkbox } from "./checkbox";
 import {
@@ -10,6 +11,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+import { EmptyState } from "./empty-state";
+import { Separator } from "./separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./sheet";
+import { Skeleton } from "./skeleton";
+import { StatCard } from "./stat-card";
 import { Switch } from "./switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import { Textarea } from "./textarea";
@@ -117,5 +130,41 @@ describe("UI primitives", () => {
 
     fireEvent.click(editItem);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("renders Avatar initials, EmptyState, StatCard, Skeleton, Separator, and Sheet", () => {
+    expect(getInitials("Admin User")).toBe("AU");
+    expect(getInitials("管理员")).toBe("管");
+
+    render(
+      <div>
+        <Avatar name="Admin User" />
+        <StatCard label="活跃会话" value={12} detail="正常在线" />
+        <EmptyState title="暂无记录" description="稍后再来看看" />
+        <Skeleton data-testid="skeleton-box" className="h-4 w-20" />
+        <Separator decorative={false} />
+        <Sheet>
+          <SheetTrigger asChild>
+            <button type="button">查看抽屉</button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>审计详情</SheetTitle>
+              <SheetDescription>查看完整元数据</SheetDescription>
+            </SheetHeader>
+          </SheetContent>
+        </Sheet>
+      </div>,
+    );
+
+    expect(screen.getByText("AU")).toBeInTheDocument();
+    expect(screen.getByText("活跃会话")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText("暂无记录")).toBeInTheDocument();
+    expect(screen.getByTestId("skeleton-box")).toBeInTheDocument();
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看抽屉" }));
+    expect(screen.getByText("审计详情")).toBeInTheDocument();
   });
 });

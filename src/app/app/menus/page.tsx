@@ -2,13 +2,17 @@ import { PageHeader } from "@/components/layout/page-header";
 import { FileText, Folder, KeyRound, ListTree, Plus, Sparkles } from "lucide-react";
 import { MENU_ICON_OPTIONS } from "@/components/layout/menu-icons";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GuardedDirectoryLink, GuardedEditForm } from "@/components/ui/guarded-edit-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusNotice } from "@/components/ui/status-notice";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Switch } from "@/components/ui/switch";
 import { createMenuAction, deleteMenuAction, updateMenuAction } from "@/features/rbac/actions";
 import { rbacNoticeMessages } from "@/features/rbac/messages";
 import { can, requirePermission } from "@/lib/auth/session";
@@ -128,7 +132,7 @@ export default async function MenusPage({
       <StatusNotice notice={params.notice} messages={rbacNoticeMessages} />
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
-        <aside className="overflow-hidden rounded-xl bg-card shadow-card lg:sticky lg:top-24">
+        <Card className="overflow-hidden lg:sticky lg:top-24">
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
             <div>
               <h2 className="font-semibold">侧栏菜单结构</h2>
@@ -155,21 +159,23 @@ export default async function MenusPage({
           </div>
 
           {nodes.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {canWrite ? "点击右上角添加第一个菜单分组或页面。" : "请联系管理员配置菜单。"}
-            </div>
+            <EmptyState
+              icon={ListTree}
+              title="还没有菜单"
+              description={canWrite ? "点击右上角添加第一个菜单分组或页面。" : "请联系管理员配置菜单。"}
+            />
           ) : (
             <nav aria-label="菜单与权限结构" className="max-h-[60vh] space-y-0.5 overflow-y-auto p-2.5 lg:max-h-[calc(100vh-12rem)]">
               {navChildrenOf(null).map((node) => treeRow(node, 0))}
             </nav>
           )}
-        </aside>
+        </Card>
 
         <div className="min-w-0 space-y-5">
-          <section
+          <Card
             key={createMode ? `create-${createType}-${params.parent ?? ""}` : selected?.id ?? "empty"}
             id="rbac-detail"
-            className="min-w-0 scroll-mt-20 rounded-xl bg-card p-5 shadow-card sm:p-6"
+            className="min-w-0 scroll-mt-20 p-5 sm:p-6"
           >
             {createMode ? (
               <>
@@ -258,13 +264,13 @@ export default async function MenusPage({
                 )}
               </>
             ) : (
-              <div className="py-16 text-center">
-                <ListTree aria-hidden="true" className="mx-auto size-8 text-muted-foreground" />
-                <p className="mt-4 font-medium">请选择菜单节点</p>
-                <p className="mt-2 text-sm text-muted-foreground">从左侧选择要查看或编辑的菜单分组或页面。</p>
-              </div>
+              <EmptyState
+                icon={ListTree}
+                title="请选择菜单节点"
+                description="从左侧选择要查看或编辑的菜单分组或页面。"
+              />
             )}
-          </section>
+          </Card>
 
           {!createMode && selected && selected.type !== "action" ? (
             <PageActionsPanel
@@ -295,7 +301,7 @@ function PageActionsPanel({
   );
 
   return (
-    <section className="rounded-xl bg-card p-5 shadow-card sm:p-6">
+    <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -391,7 +397,7 @@ function PageActionsPanel({
           ))}
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -570,7 +576,7 @@ function MenuNodeForm({
         </>
       ) : null}
 
-      {!node && type === "page" ? (
+          {!node && type === "page" ? (
         <fieldset className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-4">
           <legend className="px-1 text-sm font-medium">同时生成该页面的常用操作按钮权限</legend>
           <p className="text-xs text-muted-foreground">
@@ -578,9 +584,8 @@ function MenuNodeForm({
           </p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
             {STANDARD_ACTIONS.map((item) => (
-              <label key={item.verb} className="flex min-h-9 items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
+              <label key={item.verb} className="flex min-h-9 cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
                   name="standardActions"
                   value={item.verb}
                   defaultChecked={DEFAULT_STANDARD_ACTION_VERBS.includes(item.verb)}
@@ -594,8 +599,8 @@ function MenuNodeForm({
 
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/70 pt-4">
         {type !== "action" ? (
-          <label className="flex min-h-10 items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" name="isVisible" defaultChecked={node?.isVisible ?? true} />
+          <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-sm">
+            <Switch name="isVisible" defaultChecked={node?.isVisible ?? true} />
             在左侧菜单栏中显示
           </label>
         ) : (

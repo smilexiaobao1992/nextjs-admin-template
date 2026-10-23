@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Menu } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { AdminTheme } from "@/lib/admin-theme";
 import type { NavMenuItem } from "@/lib/rbac/permissions";
@@ -92,7 +93,6 @@ export default function UserHeader({
 }) {
   const pathname = usePathname() ?? "/app";
   const breadcrumbs = resolveBreadcrumbTrail(pathname, menus);
-  const initials = (user.name || user.email).slice(0, 2).toUpperCase();
   const roleLabel = user.roleLabel || user.role;
 
   return (
@@ -152,9 +152,9 @@ export default function UserHeader({
         <Link
           href="/app/profile"
           aria-label="个人中心"
-          className="inline-flex size-9 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary transition-[transform,background-color] hover:bg-primary/18 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex rounded-full transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {initials}
+          <Avatar name={user.name || user.email} size="sm" className="size-9 hover:bg-primary/18" />
         </Link>
         <SignOutButton />
       </div>

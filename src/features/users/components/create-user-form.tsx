@@ -1,4 +1,6 @@
 import { UserPlus } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -9,9 +11,9 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
   const defaultRole = roles.find((item) => item.isDefault)?.key ?? roles[0]?.key ?? "member";
 
   return (
-    <section
+    <Card
       aria-labelledby="create-user-title"
-      className="rounded-xl bg-card p-5 shadow-card sm:p-6"
+      className="p-5 sm:p-6"
     >
       <div className="mb-5 flex items-center gap-3">
         <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
@@ -58,12 +60,10 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
                 key={item.id}
                 className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border/80 px-3 py-2 text-sm transition-colors hover:bg-accent/45 has-checked:border-primary has-checked:bg-primary/8 has-checked:text-primary"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="roles"
                   value={item.key}
                   defaultChecked={item.key === defaultRole}
-                  className="size-4 shrink-0"
                 />
                 <span>{item.name}</span>
               </label>
@@ -75,6 +75,6 @@ export function CreateUserForm({ roles }: { roles: Role[] }) {
           <SubmitButton pendingLabel="创建中…">创建用户</SubmitButton>
         </div>
       </form>
-    </section>
+    </Card>
   );
 }

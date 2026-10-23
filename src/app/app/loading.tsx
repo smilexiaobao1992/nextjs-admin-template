@@ -1,18 +1,23 @@
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function AppLoading() {
   return (
-    <div className="space-y-7 animate-pulse" aria-busy="true" aria-label="正在加载内容">
-      {/* 标题骨架 */}
+    <div className="space-y-7" aria-busy="true" aria-label="正在加载内容">
       <div className="space-y-3">
-        <div className="h-3 w-16 rounded bg-muted" />
-        <div className="h-8 w-48 rounded bg-muted" />
-        <div className="h-4 w-96 max-w-full rounded bg-muted" />
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-96 max-w-full" />
       </div>
 
-      {/* 搜索/操作栏骨架 */}
-      <div className="h-20 rounded-xl bg-card shadow-card" />
+      <Card className="p-5">
+        <Skeleton className="h-10 w-full" />
+      </Card>
 
-      {/* 列表/内容区骨架 */}
-      <div className="h-96 rounded-xl bg-card shadow-card" />
+      <Card className="space-y-4 p-5">
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-64 w-full" />
+      </Card>
     </div>
   );
 }

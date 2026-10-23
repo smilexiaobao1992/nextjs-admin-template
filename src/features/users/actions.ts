@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auditFor } from "@/lib/audit/log";
 import { requirePermission, requireSession } from "@/lib/auth/session";
 import {
+  batchSetUsersBanned,
   changeOwnPassword,
   createCredentialUser,
   resetUserPassword,
@@ -12,6 +13,7 @@ import {
   revokeSessionForUser,
   setUserBanned,
   setUserRoles,
+  updateOwnProfile,
   UserManagementError,
 } from "@/lib/auth/user-management";
 
@@ -230,4 +232,64 @@ export async function revokeOwnSessionAction(formData: FormData) {
 
   revalidateUserSurfaces();
   redirect("/app/profile?notice=session_revoked");
+}
+
+export async function updateOwnProfileAction(formData: FormData) {
+  const session = await requireSession();
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!name || name.length > 100) {
+    redirect("/app/profile?notice=invalid_input");
+  }
+
+  try {
+    await updateOwnProfile({
+      userId: session.user.id,
+      name,
+      audit: await auditFor(session, {
+        action: "user.profile_update",
+        resourceType: "user",
+        resourceId: session.user.id,
+        summary: `更新个人昵称为 ${name}`,
+        metadata: { name },
+      }),
+    });
+  } catch (error) {
+    redirect(`/app/profile?notice=${noticeFor(error)}`);
+  }
+
+  revalidateUserSurfaces();
+  redirect("/app/profile?notice=profile_updated");
+}
+
+export async function batchSetUsersBannedAction(formData: FormData) {
+  const session = await requirePermission("users:write");
+  const userIds = formData.getAll("userIds").map(String).filter(Boolean);
+  const banned = String(formData.get("banned") ?? "") === "true";
+  const banReason = String(formData.get("banReason") ?? "");
+
+  if (userIds.length === 0) {
+    redirect("/app/users?notice=invalid_input");
+  }
+
+  try {
+    await batchSetUsersBanned({
+      userIds,
+      banned,
+      banReason,
+      actorUserId: session.user.id,
+      actorRoleKey: session.user.role ?? "",
+      audit: await auditFor(session, {
+        action: banned ? "user.batch_ban" : "user.batch_unban",
+        resourceType: "user",
+        summary: `${banned ? "批量封禁" : "批量解封"} ${userIds.length} 个用户`,
+        metadata: { userIds, ...(banned && banReason ? { banReason } : {}) },
+      }),
+    });
+  } catch (error) {
+    redirect(`/app/users?notice=${noticeFor(error)}`);
+  }
+
+  revalidateUserSurfaces();
+  redirect(`/app/users?notice=${banned ? "batch_banned" : "batch_unbanned"}`);
 }

@@ -1,6 +1,7 @@
 import { gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog, role, session, user } from "@/lib/db/schema";
+import { APP_TIME_ZONE } from "@/lib/utils";
 
 export async function getDashboardStats({
   includeUsers,
@@ -36,4 +37,53 @@ export async function getDashboardStats({
     roleCount: null,
     recentAuditCount: null,
   };
+}
+
+export type AuditDailyPoint = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+function formatDayKey(date: Date): string {
+  return date.toLocaleDateString("sv-SE", { timeZone: APP_TIME_ZONE });
+}
+
+function formatDayLabel(date: Date): string {
+  return date.toLocaleDateString("zh-CN", {
+    timeZone: APP_TIME_ZONE,
+    month: "numeric",
+    day: "numeric",
+  });
+}
+
+export async function getRecentAuditDailySeries(days = 7): Promise<AuditDailyPoint[]> {
+  const now = new Date();
+  const since = new Date(now);
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+  since.setUTCHours(0, 0, 0, 0);
+
+  const rows = await db
+    .select({ createdAt: auditLog.createdAt })
+    .from(auditLog)
+    .where(gte(auditLog.createdAt, since));
+
+  const countsByDay = new Map<string, number>();
+  for (const row of rows) {
+    const key = formatDayKey(row.createdAt);
+    countsByDay.set(key, (countsByDay.get(key) ?? 0) + 1);
+  }
+
+  const series: AuditDailyPoint[] = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const day = new Date(now);
+    day.setUTCDate(day.getUTCDate() - offset);
+    const key = formatDayKey(day);
+    series.push({
+      key,
+      label: formatDayLabel(day),
+      count: countsByDay.get(key) ?? 0,
+    });
+  }
+  return series;
 }

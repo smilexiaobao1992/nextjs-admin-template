@@ -6,6 +6,13 @@ Notable changes to this template are documented here. This project follows seman
 
 ### Added
 
+- **Standardized Composite UI Components**: Added `Sheet` (slide-over drawer), `EmptyState`, `StatCard`, `Avatar`, `Skeleton`, `Separator`, and barrel export `src/components/ui/index.ts`; refactored all app pages (`dashboard`, `users`, `roles`, `menus`, `audit`, `profile`) and `scaffold:feature` to consistently use `Card`, `Checkbox`, `Switch`, `Badge`, `Avatar`, and `EmptyState`.
+- **Human-Centric RBAC & Menu Permission UX**: Auto-derive role keys (`resolveRoleKey`) and page/action permission keys (`derivePagePermissionKeyFromHref`); separate sidebar navigation tree from page-level operation buttons (`PageActionsPanel`) in `/app/menus`, and redesign `MenuGrantTree` as a human-friendly two-column permission matrix.
+- **DataTable Server Sorting & Page Size Switcher**: Extended `parseListQuery` and `buildListHref` with `sort`, `order`, and `allowedSorts`; added `SortableTableHead` and `20 / 50 / 100` page-size selector in `ListPagination`.
+- **CSV Export Utility & Endpoints**: Added RFC-4180 CSV builder (`src/lib/list/csv.ts`) with UTF-8 BOM for Excel Chinese compatibility and formula-injection neutralization, wired to `/app/users/export` and `/app/audit/export`.
+- **Audit Log Detail Sheet**: Added slide-over `AuditDetailSheet` on `/app/audit` and `/app/profile` to inspect actor context, IP, and structured `metadata` key-value changes.
+- **Batch User Ban/Unban & Profile Center Enhancements**: Added multi-row selection and `batchSetUsersBannedAction` in User Management; upgraded `/app/profile` with display name editing (`updateOwnProfileAction`), User-Agent device/browser recognition (`formatUserAgent`), and a personal audit trail tab.
+- **Dashboard 7-Day Activity Chart & Custom 404 Page**: Added responsive 7-day audit trend bar chart and permission-aware quick links on `/app`, plus dual-theme `src/app/not-found.tsx`.
 - **Base UI Component Primitives**: Added `Textarea`, `Badge`, `Checkbox`, `Switch`, `Tabs`, and `DropdownMenu` in `src/components/ui/` built on Radix UI and CVA, with unit test coverage.
 - **Toast & Clean URL Feedback**: Connected `StatusNotice` with `sonner` toast notifications and automatic `?notice=` URL parameter cleanup via `window.history.replaceState` while preserving accessible `role="status"` / `role="alert"` banners.
 - **Dynamic Header Breadcrumbs**: Added automatic breadcrumb trail resolution in `UserHeader` derived from the active route and dynamic RBAC menu tree.
@@ -22,7 +29,7 @@ Notable changes to this template are documented here. This project follows seman
 
 ### Security
 
-- Upgrade Next.js and `eslint-config-next` to 16.4.0, resolving GHSA-3w37-wq28-93x7, GHSA-4jqv-mc3x-m676, GHSA-39w2-rjm5-chcv, GHSA-f87g-xv8r-7p7x, GHSA-mcj8-r9mp-w47p, and GHSA-cjq9-62q9-8jv4; update `sharp` and `source-map-js` dependencies to remediate CVE-2026-96889 and GHSA-68fv-2mgg-jv7q.
+- Upgrade Next.js and `eslint-config-next` to 16.4.2 (and previously 16.4.0), resolving published Next.js security advisories; update `sharp` and `source-map-js` dependencies to remediate CVE-2026-96889 and GHSA-68fv-2mgg-jv7q.
 - Prevent delegated role managers from granting permissions outside their own scope.
 - Prevent delegated user managers from modifying system-role and administrator accounts.
 - Require `dashboard:view` and hide dashboard data without its underlying read permission.

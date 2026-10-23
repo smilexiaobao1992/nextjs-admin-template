@@ -82,3 +82,12 @@ export async function getAuditLogById(id: string) {
   const [row] = await db.select().from(auditLog).where(eq(auditLog.id, id)).limit(1);
   return row ?? null;
 }
+
+export async function listAuditLogsByActor(actorUserId: string, limit = 15) {
+  return db
+    .select()
+    .from(auditLog)
+    .where(eq(auditLog.actorUserId, actorUserId))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit);
+}

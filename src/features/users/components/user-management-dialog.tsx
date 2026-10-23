@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { KeyRound, LogOut, ShieldCheck, UserRoundCog } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import {
   Dialog,
@@ -73,13 +75,9 @@ export function UserManagementDialog({
         <DialogHeader className="border-b border-border/70 bg-muted/35 px-6 py-5 pr-12 text-left">
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>{user.name}</DialogTitle>
-            <span
-              className={user.banned
-                ? "inline-flex rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive"
-                : "inline-flex rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"}
-            >
+            <Badge variant={user.banned ? "destructive" : "success"}>
               {user.banned ? "已封禁" : "正常"}
-            </span>
+            </Badge>
           </div>
           <DialogDescription className="pt-1">{user.email}</DialogDescription>
         </DialogHeader>
@@ -103,13 +101,11 @@ export function UserManagementDialog({
                       key={role.id}
                       className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border/80 px-3 py-2.5 text-sm transition-colors hover:bg-accent/45 has-checked:border-primary has-checked:bg-primary/8 has-checked:text-primary"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="roles"
                         value={role.key}
                         checked={selectedRoles.includes(role.key)}
                         onChange={(event) => toggleRole(role.key, event.currentTarget.checked)}
-                        className="size-4 shrink-0"
                       />
                       <span>{role.name}</span>
                     </label>

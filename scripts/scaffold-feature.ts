@@ -317,7 +317,9 @@ export function ${pascal}Dialog({
 `;
 
 const listComponent = `import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
+  SortableTableHead,
   Table,
   TableBody,
   TableCell,
@@ -325,6 +327,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { SortOrder } from "@/lib/list/pagination";
 import { formatDateTime } from "@/lib/utils";
 import { delete${pascal}Action } from "../actions";
 import { ${pascal}Dialog } from "./${feature}-dialog";
@@ -334,16 +337,25 @@ export function ${pascal}List({
   items,
   canUpdate,
   canDelete,
+  q = "",
+  pageSize,
+  sort,
+  order,
 }: {
   items: ${pascal}Item[];
   canUpdate: boolean;
   canDelete: boolean;
+  q?: string;
+  pageSize?: number;
+  sort?: string;
+  order?: SortOrder;
 }) {
   if (items.length === 0) {
     return (
-      <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-        暂无数据，请点击右上角新增。
-      </div>
+      <EmptyState
+        title="暂无数据"
+        description="点击右上角按钮新增第一条记录。"
+      />
     );
   }
 
@@ -351,9 +363,27 @@ export function ${pascal}List({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>名称</TableHead>
+          <SortableTableHead
+            column="name"
+            currentSort={sort}
+            currentOrder={order}
+            pathname="/app/${feature}"
+            q={q}
+            pageSize={pageSize}
+          >
+            名称
+          </SortableTableHead>
           <TableHead>描述</TableHead>
-          <TableHead>创建时间</TableHead>
+          <SortableTableHead
+            column="createdAt"
+            currentSort={sort}
+            currentOrder={order}
+            pathname="/app/${feature}"
+            q={q}
+            pageSize={pageSize}
+          >
+            创建时间
+          </SortableTableHead>
           {canUpdate || canDelete ? <TableHead className="text-right">操作</TableHead> : null}
         </TableRow>
       </TableHeader>
@@ -396,6 +426,7 @@ export function ${pascal}List({
 `;
 
 const page = `import { PageHeader } from "@/components/layout/page-header";
+import { Card } from "@/components/ui/card";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { ListSearchForm } from "@/components/ui/list-search-form";
 import { StatusNotice } from "@/components/ui/status-notice";
@@ -409,11 +440,22 @@ import { parseListQuery } from "@/lib/list/pagination";
 export default async function ${pascal}Page({
   searchParams,
 }: {
-  searchParams: Promise<{ notice?: string; page?: string; q?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    notice?: string;
+    page?: string;
+    q?: string;
+    pageSize?: string;
+    sort?: string;
+    order?: string;
+  }>;
 }) {
   const session = await requirePermission("${resource}:read");
   const params = await searchParams;
-  const listQuery = parseListQuery(params);
+  const listQuery = parseListQuery(params, {
+    sort: "createdAt",
+    order: "desc",
+    allowedSorts: ["name", "createdAt"],
+  });
 
   const [data, canCreate, canUpdate, canDelete] = await Promise.all([
     list${pascal}Page(listQuery),
@@ -427,24 +469,24 @@ export default async function ${pascal}Page({
       <PageHeader
         eyebrow="${title}"
         title="${pascal} 管理"
-        description="业务数据管理列表。支持搜索、分页与操作权限隔离。"
+        description="业务数据管理列表。支持搜索、排序、分页与操作权限隔离。"
         actions={canCreate ? <${pascal}Dialog /> : null}
       />
 
       <StatusNotice notice={params.notice} messages={${resource}NoticeMessages} />
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
+      <Card className="p-5">
         <ListSearchForm
           action="/app/${feature}"
           defaultQuery={listQuery.q}
           placeholder="按名称搜索…"
           label="搜索"
         />
-      </div>
+      </Card>
 
-      <section
+      <Card
         aria-labelledby="${feature}-list-title"
-        className="overflow-hidden rounded-xl bg-card shadow-card"
+        className="overflow-hidden"
       >
         <div className="border-b border-border/70 px-5 py-4">
           <h2 id="${feature}-list-title" className="font-semibold">
@@ -459,6 +501,10 @@ export default async function ${pascal}Page({
           items={data.items}
           canUpdate={canUpdate}
           canDelete={canDelete}
+          q={listQuery.q}
+          pageSize={data.pageSize}
+          sort={data.sort}
+          order={data.order}
         />
 
         <ListPagination
@@ -467,8 +513,10 @@ export default async function ${pascal}Page({
           pageSize={data.pageSize}
           total={data.total}
           q={listQuery.q}
+          sort={data.sort}
+          order={data.order}
         />
-      </section>
+      </Card>
     </div>
   );
 }

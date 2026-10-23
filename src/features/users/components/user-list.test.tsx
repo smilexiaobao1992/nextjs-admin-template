@@ -6,6 +6,7 @@ import { UserList } from "./user-list";
 vi.mock("@/features/users/actions", () => ({
   setUserRolesAction: vi.fn(),
   setUserBannedAction: vi.fn(),
+  batchSetUsersBannedAction: vi.fn(),
   resetUserPasswordAction: vi.fn(),
   revokeUserSessionsAction: vi.fn(),
 }));
@@ -131,5 +132,17 @@ describe("UserList", () => {
     expect(screen.getByRole("checkbox", { name: "普通成员" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "高级运营" })).toBeChecked();
     expect(screen.getByText("已选择 2 个角色")).toBeInTheDocument();
+  });
+
+  it("supports selecting rows and showing the batch action toolbar", async () => {
+    const interaction = userEvent.setup();
+    render(<UserList users={[user]} roles={roles} canWrite total={1} />);
+
+    await interaction.click(
+      screen.getByRole("checkbox", { name: `选择账号 ${user.email}` }),
+    );
+    expect(screen.getByText("已选 1 项")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量封禁" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量解封" })).toBeInTheDocument();
   });
 });

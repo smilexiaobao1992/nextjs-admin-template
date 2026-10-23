@@ -3,6 +3,8 @@ export const userNoticeMessages: Record<string, string> = {
   role_updated: "角色已更新。",
   banned: "用户已封禁，其会话已全部撤销。",
   unbanned: "用户已解封。",
+  batch_banned: "所选用户已批量封禁，其会话已全部撤销。",
+  batch_unbanned: "所选用户已批量解封。",
   password_reset: "密码已重置，该用户需使用新密码重新登录。",
   sessions_revoked: "已撤销该用户的全部会话。",
   password_changed: "密码已更新，其他设备上的登录已退出。",
@@ -23,6 +25,7 @@ export const userNoticeMessages: Record<string, string> = {
 
 export const profileNoticeMessages: Record<string, string> = {
   forbidden: "当前账号没有访问该页面的权限。",
+  profile_updated: "个人资料已更新。",
   password_changed: userNoticeMessages.password_changed,
   password_mismatch: userNoticeMessages.password_mismatch,
   session_revoked: userNoticeMessages.session_revoked,
